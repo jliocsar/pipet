@@ -1,6 +1,13 @@
 import * as path from 'node:path'
 import * as childProcess from 'node:child_process'
 
+type Dict<T> = {
+  [key: string]: T
+}
+type StringIndex<T extends Dict<any>> = T[string]
+type Nullable<T> = T | null
+type Promiseable<T> = T | Promise<T>
+
 type Next = {
   args?: {
     [argKey: '$' | string]: {
@@ -25,17 +32,14 @@ type Next = {
     }
   }
 }
-type NextEnvDef = Required<Next>['env'][string]
-type NextArgDef = Required<Next>['args'][string]
+type NextEnvDef = StringIndex<Required<Next>['env']>
+type NextArgDef = StringIndex<Required<Next>['args']>
 type NextEnvEntry = [EnvKey: string, NextEnvDef]
 type NextArgEntry = [EnvKey: string, NextArgDef]
+type RunnableDef = (() => (...args: any[]) => any) | ScriptDef
 
-export type ScriptEnv =
-  | Record<string, any>
-  | NodeJS.ProcessEnv
-  | 'inherit'
-  | null
-export type ScriptArgs = Next['args'] | null
+export type ScriptEnv = Nullable<Dict<any> | NodeJS.ProcessEnv | 'inherit'>
+export type ScriptArgs = Nullable<Next['args']>
 export type ScriptDef<
   Script extends string = string,
   Env extends ScriptEnv = ScriptEnv,
@@ -47,15 +51,14 @@ export type ScriptDef<
   /** @default 'inherit' */
   env?: Env
 }
-type RunnableDef = (() => (...args: any[]) => any) | ScriptDef
 
-export type Hooks = {
+export type RunHooks = {
   /** Runs before all scripts, useful for building etc */
-  beforeRun?: () => void | Promise<void>
+  beforeRun?: () => Promiseable<void>
   /** Runs after all scripts, useful for any clean up */
-  afterRun?: () => void | Promise<void>
+  afterRun?: () => Promiseable<void>
 }
-export type PipetOptions = Hooks & {
+export type PipetOptions = RunHooks & {
   /** @default process.cwd() */
   cwd?: string
   /** @default 'node' */
@@ -72,7 +75,11 @@ class PipetError extends Error {
 }
 
 export class Pipet {
-  constructor(private readonly abortController = new AbortController()) {}
+  private readonly abortController: AbortController
+
+  constructor() {
+    this.abortController = new AbortController()
+  }
 
   async run<Runnables extends RunnableDef[], Options extends PipetOptions>(
     runnables: Runnables,
@@ -164,7 +171,7 @@ export class Pipet {
   private checkRequiredFields(
     scriptPath: string,
     entries: (NextEnvEntry | NextArgEntry)[],
-    map: NodeJS.ProcessEnv | Record<string, string>,
+    map: NodeJS.ProcessEnv,
   ) {
     const length = entries.length
     let index = 0
@@ -205,7 +212,7 @@ export class Pipet {
     data: string,
     entries: [string, NextEnvDef | NextArgDef][],
   ) {
-    const map: Record<string, string> = {}
+    const map: NodeJS.ProcessEnv = {}
     const length = entries.length
     let index = 0
     while (index < length) {
@@ -213,6 +220,7 @@ export class Pipet {
       const regex = def.match.global ? def.match : new RegExp(def.match, 'g')
       const match = data.matchAll(regex)
       if (!match) {
+        index++
         continue
       }
       for (const [, ...value] of match) {
@@ -251,13 +259,13 @@ export class Pipet {
     while (index < length) {
       const [key, value] = params.argsEntries[index]
       const mapped = argsMap[key]
-      if (value.required && [undefined, ''].includes(mapped)) {
+      if (value.required && [undefined, null, ''].includes(mapped)) {
         throw new PipetError(
           `Required arg "${key}" is not set after running script "${params.scriptPath}"`,
         )
       }
       if (key === '$') {
-        args.push(mapped)
+        args.push(mapped!)
         index++
         continue
       }

@@ -1,15 +1,15 @@
 {
   "name": "pipet",
-  "version": "1.0.0",
-  "main": "index.js",
+  "version": "0.0.1",
+  "main": "pipet.ts",
   "license": "MIT",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "run": "tsx index.test.ts"
   },
   "devDependencies": {
-    "@types/node": "^20.8.10",
-    "tsx": "^3.14.0",
+    "@types/node": "latest",
+    "tsx": "latest",
     "typescript": "latest"
   }
 }

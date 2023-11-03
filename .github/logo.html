@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+    <style>
+      html {
+        font-family: Nanum Gothic;
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+      }
+
+      html,
+      body,
+      main,
+      .logo {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+
+      .icon {
+        font-size: 6rem;
+        margin-top: 2rem;
+      }
+
+      .logo-wrapper {
+        display: flex;
+        flex-direction: column;
+        justify-content: end;
+        align-items: center;
+      }
+
+      main {
+        display: flex;
+        margin: auto;
+        width: 960px;
+        height: 400px;
+        background-image: linear-gradient(
+          35deg,
+          hsl(264deg 71% 51%) 0%,
+          hsl(253deg 81% 36%) 19%,
+          hsl(243deg 96% 22%) 46%,
+          hsl(241deg 96% 18%) 61%,
+          hsl(243deg 90% 17%) 71%,
+          hsl(241deg 89% 20%) 78%,
+          hsl(236deg 90% 27%) 84%,
+          hsl(227deg 91% 34%) 90%,
+          hsl(208deg 91% 40%) 95%,
+          hsl(190deg 90% 46%) 100%
+        );
+      }
+
+      h1,
+      p {
+        color: white;
+      }
+
+      h1 {
+        font-weight: 700;
+        font-size: 8rem;
+        line-height: 0.2;
+      }
+
+      p {
+        font-size: 1.8rem;
+        font-weight: 400;
+        opacity: 0.6;
+        margin: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="logo-wrapper">
+        <div class="logo">
+          <span class="icon">⚡</span>
+          <h1>pipet</h1>
+        </div>
+        <p>Run scripts effortlessly</p>
+      </div>
+    </main>
+  </body>
+</html>
