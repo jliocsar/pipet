@@ -17,7 +17,7 @@ new Pipet().run(
     script('scriptpath.js'),
   ],
   {
-    beforeRun() {
+    afterRun() {
       console.log('hehe')
     },
   },

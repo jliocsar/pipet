@@ -31,7 +31,7 @@ export type ScriptEnv =
   | NodeJS.ProcessEnv
   | 'inherit'
   | null
-export type ScriptArgs = Next['args'] | 'inherit' | null
+export type ScriptArgs = Next['args'] | null
 export type ScriptDef<
   Script extends string = string,
   Env extends ScriptEnv = ScriptEnv,
@@ -46,6 +46,7 @@ export type ScriptDef<
 
 export type Hooks = {
   beforeRun?: () => void | Promise<void>
+  afterRun?: () => void | Promise<void>
 }
 export type PipetOptions = Hooks
 
@@ -73,7 +74,10 @@ export class Pipet {
     if (options?.beforeRun) {
       await options.beforeRun()
     }
-    return this.reduce(scripts)
+    this.reduce(scripts)
+    if (options?.afterRun) {
+      await options.afterRun()
+    }
   }
 
   private reduce<Scripts extends ScriptDef[]>(
@@ -97,7 +101,7 @@ export class Pipet {
     const argsEntries = scriptDef.next?.args
       ? Object.entries(scriptDef.next.args)
       : []
-    return this.fork(
+    return this.spawnDeez(
       scriptPath,
       error => {
         if (error) {
@@ -169,7 +173,7 @@ export class Pipet {
     }
   }
 
-  private fork(
+  private spawnDeez(
     modulePath: string,
     callback: (err?: Error) => void,
     options?: childProcess.ForkOptions & {
