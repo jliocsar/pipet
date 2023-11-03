@@ -33,6 +33,7 @@ type Next = {
       separator?: string
     }
   }
+  decorateEnv?(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv
 }
 type NextEnvDef = StringIndex<Required<Next>['env']>
 type NextArgDef = StringIndex<Required<Next>['args']>
@@ -77,6 +78,10 @@ class PipetError extends Error {
 }
 
 export class Pipet {
+  // Env is accumulated (not overwritten) for each script
+  // This behavior can be changed in the `buildNextScriptParams` method
+  // if necessary someday
+  private readonly env: NodeJS.ProcessEnv = process.env
   private readonly abortController: AbortController
 
   constructor() {
@@ -108,11 +113,7 @@ export class Pipet {
     const cwd = options?.cwd ?? process.cwd()
     const bin = options?.bin ?? 'node'
     const binArgs = options?.binArgs ?? []
-    // Env is accumulated (not overwritten) for each script
-    // This behavior can be changed in the `buildNextScriptParams` method
-    // if necessary someday
-    const env: NodeJS.ProcessEnv = process.env
-    // Args isn't though
+    // Args isn't accumulated as env
     let args: string[] = []
     return runnables.reduce<(1 | Error)[]>((results, runnableDef) => {
       if (!this.isScriptDef(runnableDef)) {
@@ -121,7 +122,7 @@ export class Pipet {
         return results
       }
       if (runnableDef.env && runnableDef.env !== 'inherit') {
-        Object.assign(env, this.serialize(runnableDef.env))
+        Object.assign(this.env, this.serialize(runnableDef.env))
       }
       const scriptPath = path.resolve(cwd, runnableDef.script)
       const envEntries = runnableDef.next?.env
@@ -131,7 +132,7 @@ export class Pipet {
         ? Object.entries(runnableDef.next.args)
         : []
       const { data, error } = this.spawn(scriptPath, bin, binArgs, {
-        env,
+        env: this.env,
         args,
         signal: this.abortController.signal,
       })
@@ -142,9 +143,10 @@ export class Pipet {
       args = this.buildNextScriptParams(data!, {
         scriptPath,
         envEntries,
-        env,
+        env: this.env,
         argsEntries,
       }).args
+      Object.assign(this.env, runnableDef.next?.decorateEnv?.(this.env) ?? {})
       results.push(1)
       return results
     }, [])
