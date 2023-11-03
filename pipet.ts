@@ -56,6 +56,8 @@ export type Hooks = {
   afterRun?: () => void | Promise<void>
 }
 export type PipetOptions = Hooks & {
+  /** @default process.cwd() */
+  cwd?: string
   /** @default 'node' */
   bin?: string
   /** @default [] */
@@ -70,10 +72,7 @@ class PipetError extends Error {
 }
 
 export class Pipet {
-  constructor(
-    private readonly cwd = process.cwd(),
-    private readonly abortController = new AbortController(),
-  ) {}
+  constructor(private readonly abortController = new AbortController()) {}
 
   async run<Runnables extends RunnableDef[], Options extends PipetOptions>(
     runnables: Runnables,
@@ -97,6 +96,7 @@ export class Pipet {
     runnables: Runnables,
     options?: Options,
   ) {
+    const cwd = options?.cwd ?? process.cwd()
     const bin = options?.bin ?? 'node'
     const binArgs = options?.binArgs ?? []
     // Env is accumulated (not overwritten) for each script
@@ -114,7 +114,7 @@ export class Pipet {
       if (runnableDef.env && runnableDef.env !== 'inherit') {
         Object.assign(env, this.serialize(runnableDef.env))
       }
-      const scriptPath = path.resolve(this.cwd, runnableDef.script)
+      const scriptPath = path.resolve(cwd, runnableDef.script)
       const envEntries = runnableDef.next?.env
         ? Object.entries(runnableDef.next.env)
         : []
