@@ -1,15 +1,15 @@
-import { pipet, script } from './pipet'
+import { Pipet, script } from './pipet'
 
 const env = {
   count: 0,
 }
 
-pipet(
+new Pipet().run(
   [
     script('scriptpath.js', env, {
       env: {
         countResult: {
-          match: /Count is (.+)/,
+          match: /Count iz (.+) and (.+)/,
           csv: true,
         },
       },
