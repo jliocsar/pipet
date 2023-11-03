@@ -91,7 +91,7 @@ function buildOnDataHandler(
   }
 }
 
-function reduce<Scripts extends ScriptDef[]>(scripts: Scripts) {
+function reduce<Scripts extends ScriptDef[]>(scripts: Scripts): void {
   const scriptDef = scripts.shift()
   if (!scriptDef) {
     return
