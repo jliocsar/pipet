@@ -1,7 +1,36 @@
 import * as path from 'node:path'
 import * as childProcess from 'node:child_process'
 
-import type { ScriptDef, PipetOptions, ScriptEnv, Next } from './types'
+export type Next = {
+  env?: {
+    [envKey: string]: {
+      match: RegExp
+      required?: boolean
+      csv?: boolean
+    }
+  }
+}
+export type NextEnvDef = Record<string, Required<Next>['env'][string]>
+
+export type ScriptEnv =
+  | Record<string, any>
+  | NodeJS.ProcessEnv
+  | 'inherit'
+  | null
+export type ScriptDef<
+  Script extends string = string,
+  Env extends ScriptEnv = ScriptEnv,
+> = {
+  script: Script
+  next?: Next
+  /** @default 'inherit' */
+  env?: Env
+}
+
+export type Hooks = {
+  beforeRun?: () => void | Promise<void>
+}
+export type PipetOptions = Hooks
 
 class PipetError extends Error {
   constructor(message: string) {
@@ -38,29 +67,40 @@ function fork(
     })
 }
 
-function buildOnDataHandler(scriptDef: ScriptDef) {
+function buildOnDataHandler(
+  nextEnvDef: NextEnvDef = {},
+  env: NodeJS.ProcessEnv,
+) {
+  const entries = Object.entries(nextEnvDef)
   return (message: string) => {
-    console.log(message)
+    process.stdout.write(message)
+    for (const [key, def] of entries) {
+      const regex = def.match.global ? def.match : new RegExp(def.match, 'g')
+      const match = message.matchAll(regex)
+      if (!match) {
+        continue
+      }
+      for (const [, value] of match) {
+        if (def.csv && env[key]) {
+          env[key] += `,${value}`
+        } else {
+          env[key] = value
+        }
+      }
+    }
   }
 }
 
-type NextEnvEntry = Required<Next>['env'][string]
-const nextEnvMap = new WeakMap<Next, [EnvKey: string, NextEnvEntry][]>()
-
-function reduce<Scripts extends ScriptDef[]>(scripts: Scripts): void {
+function reduce<Scripts extends ScriptDef[]>(scripts: Scripts) {
   const scriptDef = scripts.shift()
   if (!scriptDef) {
     return
   }
-  let env = process.env
+  const env: NodeJS.ProcessEnv = process.env
   if (scriptDef.env && scriptDef.env !== 'inherit') {
-    env = Object.assign(scriptDef.env, env)
+    Object.assign(env, scriptDef.env)
   }
   const scriptPath = path.resolve(cwd, scriptDef.script)
-  let nextEnvEntries: any[] = []
-  if (scriptDef.next?.env && nextEnvMap.has(scriptDef.next.env)) {
-    nextEnvEntries = Object.entries(nextEnvMap.get(scriptDef.next.env)!)
-  }
   return fork(
     scriptPath,
     error => {
@@ -72,8 +112,8 @@ function reduce<Scripts extends ScriptDef[]>(scripts: Scripts): void {
     {
       env,
       signal,
-      onData: buildOnDataHandler(nextEnvEntries),
       stdio: 'pipe',
+      onData: buildOnDataHandler(scriptDef.next?.env, env),
     },
   )
 }

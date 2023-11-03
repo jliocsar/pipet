@@ -6,18 +6,15 @@ const env = {
 
 pipet(
   [
-    script('scriptpath.js', env),
     script('scriptpath.js', env, {
       env: {
-        count: {
+        countResult: {
           match: /Count is (.+)/,
+          csv: true,
         },
       },
     }),
-    // script('scriptpath.js'),
-    // script('scriptpath.js'),
-    // script('scriptpath.js'),
-    // script('scriptpath.js'),
+    script('scriptpath.js'),
   ],
   {
     beforeRun() {
