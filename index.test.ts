@@ -7,9 +7,9 @@ const env = {
 new Pipet().run(
   [
     script('scriptpath.js', env, {
-      env: {
+      args: {
         countResult: {
-          match: /Count iz (.+) and (.+)/,
+          match: /Count is (.+) and (.+)/,
           csv: true,
         },
       },
