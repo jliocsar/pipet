@@ -14,7 +14,24 @@ new Pipet().run(
         },
       },
     }),
-    script('scriptpath.js'),
+    script('scriptpath.js', null, {
+      env: {
+        countResult: {
+          match: /Count is (.+) and (.+)/,
+          csv: true,
+        },
+      },
+    }),
+    script('scriptpath.js', null, {
+      args: {
+        $: {
+          match: /Count is (.+) and (.+)/,
+          csv: true,
+          separator: ' ',
+        },
+      },
+    }),
+    script('scriptpath.js', env),
   ],
   {
     afterRun() {

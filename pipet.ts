@@ -3,14 +3,16 @@ import * as childProcess from 'node:child_process'
 
 type Next = {
   args?: {
-    [argKey: string]: {
+    [argKey: '$' | string]: {
       match: RegExp
       required?: boolean
       csv?: boolean
       /** @default '--' */
-      prefix?: '-' | '--' | ''
+      prefix?: '-' | '--' | '' | (string & {})
       /** @default '=' */
-      equality?: '=' | ' ' | ''
+      equality?: '=' | ' ' | '' | (string & {})
+      /** @default ',' */
+      separator?: ',' | ' ' | '' | (string & {})
     }
   }
   env?: {
@@ -18,6 +20,8 @@ type Next = {
       match: RegExp
       required?: boolean
       csv?: boolean
+      /** @default ',' */
+      separator?: string
     }
   }
 }
@@ -80,49 +84,40 @@ export class Pipet {
     }
   }
 
-  private reduce<Scripts extends ScriptDef[]>(
-    scripts: Scripts,
-    env: NodeJS.ProcessEnv = {},
-  ): void {
-    const scriptDef = scripts.shift()
-    if (!scriptDef) {
-      return
-    }
-    const args: string[] = []
-    if (scriptDef.env === 'inherit') {
-      Object.assign(env, process.env)
-    } else if (scriptDef.env) {
-      Object.assign(env, this.serialize(scriptDef.env))
-    }
-    const scriptPath = path.resolve(this.cwd, scriptDef.script)
-    const envEntries = scriptDef.next?.env
-      ? Object.entries(scriptDef.next.env)
-      : []
-    const argsEntries = scriptDef.next?.args
-      ? Object.entries(scriptDef.next.args)
-      : []
-    return this.spawnDeez(
-      scriptPath,
-      error => {
-        if (error) {
-          throw new Error(error.message)
-        }
-        console.log({ args })
-        return this.reduce(scripts, env)
-      },
-      {
+  private reduce<Scripts extends ScriptDef[]>(scripts: Scripts): void {
+    // Env is accumulated (not overwritten) for each script
+    // This behavior can be changed in the `buildNextScriptParams` method
+    // if necessary someday
+    const env: NodeJS.ProcessEnv = process.env
+    // Args isn't though
+    let args: string[] = []
+    const length = scripts.length
+    let index = 0
+    while (index < length) {
+      const scriptDef = scripts[index]
+      if (scriptDef.env && scriptDef.env !== 'inherit') {
+        Object.assign(env, this.serialize(scriptDef.env))
+      }
+      const scriptPath = path.resolve(this.cwd, scriptDef.script)
+      const envEntries = scriptDef.next?.env
+        ? Object.entries(scriptDef.next.env)
+        : []
+      const argsEntries = scriptDef.next?.args
+        ? Object.entries(scriptDef.next.args)
+        : []
+      const { data } = this.spawnDeez(scriptPath, {
         env,
-        stdio: 'pipe',
+        args,
         signal: this.abortController.signal,
-        onData: this.buildOnDataHandler({
-          scriptPath,
-          envEntries,
-          env,
-          argsEntries,
-          args,
-        }),
-      },
-    )
+      })
+      args = this.buildNextScriptParams(data!, {
+        scriptPath,
+        envEntries,
+        env,
+        argsEntries,
+      }).args
+      index++
+    }
   }
 
   private serialize(scriptDefEnv: Omit<ScriptDef['env'], 'inherit'>) {
@@ -145,57 +140,38 @@ export class Pipet {
     }, {})
   }
 
-  private checkRequiredEnv(
+  private checkRequiredFields(
     scriptPath: string,
-    entries: NextEnvEntry[],
-    env: NodeJS.ProcessEnv,
+    entries: (NextEnvEntry | NextArgEntry)[],
+    map: NodeJS.ProcessEnv | Record<string, string>,
   ) {
-    for (const [key, def] of entries) {
-      if (def.required && [undefined, ''].includes(env[key])) {
+    const length = entries.length
+    let index = 0
+    while (index < length) {
+      const [key, def] = entries[index]
+      if (def.required && [undefined, ''].includes(map[key])) {
         throw new PipetError(
-          `Required env "${key}" is not set after running script "${scriptPath}"`,
+          `Required key "${key}" is not set after running script "${scriptPath}"`,
         )
       }
-    }
-  }
-
-  private checkRequiredArgs(
-    scriptPath: string,
-    entries: NextArgEntry[],
-    args: Record<string, string>,
-  ) {
-    for (const [key, def] of entries) {
-      if (def.required && !args[key]) {
-        throw new PipetError(
-          `Required arg "${key}" was not passed after running script "${scriptPath}"`,
-        )
-      }
+      index++
     }
   }
 
   private spawnDeez(
     modulePath: string,
-    callback: (err?: Error) => void,
-    options?: childProcess.ForkOptions & {
-      onData?: (message: string) => any
+    options?: childProcess.SpawnOptions & {
+      args?: string[]
     },
   ) {
-    const child = childProcess.fork(modulePath, options)
-    const onData = options?.onData
-    let data = Buffer.alloc(0)
-    if (onData) {
-      child.stdout!.on('data', buffer => {
-        data = Buffer.concat([data, buffer])
-      })
-    }
-    child
-      .on('exit', () => {
-        onData?.(data.toString('utf-8'))
-        callback()
-      })
-      .on('error', error => {
-        callback(error)
-      })
+    const args = [modulePath].concat(options?.args ?? [])
+    const { output } = childProcess.spawnSync('node', args, {
+      encoding: 'utf-8',
+      env: options?.env,
+      signal: options?.signal,
+    })
+    const [data] = output.filter(Boolean)
+    return { data }
   }
 
   private buildFromGlobalMatch(
@@ -203,52 +179,67 @@ export class Pipet {
     entries: [string, NextEnvDef | NextArgDef][],
   ) {
     const map: Record<string, string> = {}
-    for (const [key, def] of entries) {
+    const length = entries.length
+    let index = 0
+    while (index < length) {
+      const [key, def] = entries[index]
       const regex = def.match.global ? def.match : new RegExp(def.match, 'g')
       const match = data.matchAll(regex)
       if (!match) {
         continue
       }
       for (const [, ...value] of match) {
-        const joined = value.join(',')
+        const joined = value.join(def.separator ?? ',')
         if (def.csv && map[key]) {
           map[key] += `,${joined}`
         } else {
           map[key] = joined
         }
       }
+      index++
     }
     return map
   }
 
-  private buildOnDataHandler(params: {
-    scriptPath: string
-    envEntries: NextEnvEntry[]
-    env: NodeJS.ProcessEnv
-    argsEntries: NextArgEntry[]
-    args: string[]
-  }) {
-    return (data: string) => {
-      process.stdout.write(data)
-      const argsMap = this.buildFromGlobalMatch(data, params.argsEntries)
-      this.checkRequiredArgs(params.scriptPath, params.argsEntries, argsMap)
-      Object.assign(
-        params.env,
-        this.buildFromGlobalMatch(data, params.envEntries),
-      )
-      this.checkRequiredEnv(params.scriptPath, params.envEntries, params.env)
-      for (const [key, value] of params.argsEntries) {
-        const mapped = argsMap[key]
-        if (value.required && [undefined, ''].includes(mapped)) {
-          throw new PipetError(
-            `Required arg "${key}" is not set after running script "${params.scriptPath}"`,
-          )
-        }
-        const prefix = value.prefix ?? '--'
-        const equality = value.equality ?? '='
-        params.args.push(`${prefix}${this.toDashCase(key)}${equality}${mapped}`)
+  private buildNextScriptParams(
+    data: string,
+    params: {
+      scriptPath: string
+      envEntries: NextEnvEntry[]
+      env: NodeJS.ProcessEnv
+      argsEntries: NextArgEntry[]
+    },
+  ) {
+    process.stdout.write(data)
+    const argsMap = this.buildFromGlobalMatch(data, params.argsEntries)
+    const args: string[] = []
+    this.checkRequiredFields(params.scriptPath, params.argsEntries, argsMap)
+    Object.assign(
+      params.env,
+      this.buildFromGlobalMatch(data, params.envEntries),
+    )
+    this.checkRequiredFields(params.scriptPath, params.envEntries, params.env)
+    const length = params.argsEntries.length
+    let index = 0
+    while (index < length) {
+      const [key, value] = params.argsEntries[index]
+      const mapped = argsMap[key]
+      if (value.required && [undefined, ''].includes(mapped)) {
+        throw new PipetError(
+          `Required arg "${key}" is not set after running script "${params.scriptPath}"`,
+        )
       }
+      if (key === '$') {
+        args.push(mapped)
+        index++
+        continue
+      }
+      const prefix = value.prefix ?? '--'
+      const equality = value.equality ?? '='
+      args.push(`${prefix}${this.toDashCase(key)}${equality}${mapped}`)
+      index++
     }
+    return { args }
   }
 
   private toDashCase(value: string) {
