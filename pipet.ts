@@ -11,7 +11,8 @@ type Promiseable<T> = T | Promise<T>
 type Next = {
   args?: {
     [argKey: '$' | string]: {
-      match: RegExp
+      match?: RegExp
+      value?: string
       required?: boolean
       csv?: boolean
       /** @default '--' */
@@ -24,7 +25,8 @@ type Next = {
   }
   env?: {
     [envKey: string]: {
-      match: RegExp
+      match?: RegExp
+      value?: string
       required?: boolean
       csv?: boolean
       /** @default ',' */
@@ -217,7 +219,21 @@ export class Pipet {
     let index = 0
     while (index < length) {
       const [key, def] = entries[index]
-      const regex = def.match.global ? def.match : new RegExp(def.match, 'g')
+      if (!def.value && !def.match) {
+        throw new PipetError(
+          `Next entry "${key}" is missing a \`value\` or \`match\` property`,
+        )
+      }
+      if (def.value) {
+        if (def.csv && map[key]) {
+          map[key] += `,${def.value}`
+        } else {
+          map[key] = def.value
+        }
+        index++
+        continue
+      }
+      const regex = def.match!.global ? def.match! : new RegExp(def.match!, 'g')
       const match = data.matchAll(regex)
       if (!match) {
         index++
@@ -271,7 +287,7 @@ export class Pipet {
       }
       const prefix = value.prefix ?? '--'
       const equality = value.equality ?? '='
-      args.push(`${prefix}${this.toDashCase(key)}${equality}${mapped}`)
+      args.push(`${prefix}${key}${equality}${mapped}`)
       index++
     }
     return { args }
@@ -279,10 +295,6 @@ export class Pipet {
 
   private isScriptDef(runnable: RunnableDef): runnable is ScriptDef {
     return 'script' in runnable
-  }
-
-  private toDashCase(value: string) {
-    return value.replace(/([A-Z])/g, '-$1').toLowerCase()
   }
 }
 
