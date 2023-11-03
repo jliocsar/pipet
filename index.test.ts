@@ -1,4 +1,4 @@
-import { Pipet, script } from './pipet'
+import { Pipet, B, U } from './pipet'
 
 const env = {
   count: 0,
@@ -6,7 +6,7 @@ const env = {
 
 new Pipet().run(
   [
-    script('scriptpath.js', env, {
+    B.script('scriptpath.js', env, {
       args: {
         countResult: {
           match: /Count is (.+) and (.+)/,
@@ -14,7 +14,8 @@ new Pipet().run(
         },
       },
     }),
-    script('scriptpath.js', null, {
+    U.log('hello'),
+    B.script('scriptpath.js', null, {
       env: {
         countResult: {
           match: /Count is (.+) and (.+)/,
@@ -22,7 +23,8 @@ new Pipet().run(
         },
       },
     }),
-    script('scriptpath.js', null, {
+    B.script('scriptpath.js', env),
+    B.script('scriptpath.js', null, {
       args: {
         $: {
           match: /Count is (.+) and (.+)/,
@@ -31,9 +33,10 @@ new Pipet().run(
         },
       },
     }),
-    script('scriptpath.js', env),
+    B.script('scriptpath.js', env),
   ],
   {
+    binArgs: ['--title=hello'],
     afterRun() {
       console.log('hehe')
     },

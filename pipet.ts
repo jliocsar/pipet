@@ -47,12 +47,20 @@ export type ScriptDef<
   /** @default 'inherit' */
   env?: Env
 }
+type RunnableDef = (() => (...args: any[]) => any) | ScriptDef
 
 export type Hooks = {
+  /** Runs before all scripts, useful for building etc */
   beforeRun?: () => void | Promise<void>
+  /** Runs after all scripts, useful for any clean up */
   afterRun?: () => void | Promise<void>
 }
-export type PipetOptions = Hooks
+export type PipetOptions = Hooks & {
+  /** @default 'node' */
+  bin?: string
+  /** @default [] */
+  binArgs?: string[]
+}
 
 class PipetError extends Error {
   constructor(message: string) {
@@ -67,57 +75,70 @@ export class Pipet {
     private readonly abortController = new AbortController(),
   ) {}
 
-  async run<Scripts extends ScriptDef[]>(
-    scripts: Scripts,
-    options?: PipetOptions,
+  async run<Runnables extends RunnableDef[], Options extends PipetOptions>(
+    runnables: Runnables,
+    options?: Options,
   ) {
-    const length = scripts.length
+    const length = runnables.length
     if (length < 1) {
       throw new PipetError('Need at least 1 script to run')
     }
     if (options?.beforeRun) {
       await options.beforeRun()
     }
-    this.reduce(scripts)
+    const results = this.reduce(runnables, options)
     if (options?.afterRun) {
       await options.afterRun()
     }
+    return results
   }
 
-  private reduce<Scripts extends ScriptDef[]>(scripts: Scripts): void {
+  private reduce<Runnables extends RunnableDef[], Options extends PipetOptions>(
+    runnables: Runnables,
+    options?: Options,
+  ) {
+    const bin = options?.bin ?? 'node'
+    const binArgs = options?.binArgs ?? []
     // Env is accumulated (not overwritten) for each script
     // This behavior can be changed in the `buildNextScriptParams` method
     // if necessary someday
     const env: NodeJS.ProcessEnv = process.env
     // Args isn't though
     let args: string[] = []
-    const length = scripts.length
-    let index = 0
-    while (index < length) {
-      const scriptDef = scripts[index]
-      if (scriptDef.env && scriptDef.env !== 'inherit') {
-        Object.assign(env, this.serialize(scriptDef.env))
+    return runnables.reduce<(1 | Error)[]>((results, runnableDef) => {
+      if (!this.isScriptDef(runnableDef)) {
+        runnableDef()
+        results.push(1)
+        return results
       }
-      const scriptPath = path.resolve(this.cwd, scriptDef.script)
-      const envEntries = scriptDef.next?.env
-        ? Object.entries(scriptDef.next.env)
+      if (runnableDef.env && runnableDef.env !== 'inherit') {
+        Object.assign(env, this.serialize(runnableDef.env))
+      }
+      const scriptPath = path.resolve(this.cwd, runnableDef.script)
+      const envEntries = runnableDef.next?.env
+        ? Object.entries(runnableDef.next.env)
         : []
-      const argsEntries = scriptDef.next?.args
-        ? Object.entries(scriptDef.next.args)
+      const argsEntries = runnableDef.next?.args
+        ? Object.entries(runnableDef.next.args)
         : []
-      const { data } = this.spawnDeez(scriptPath, {
+      const { data, error } = this.spawn(scriptPath, bin, binArgs, {
         env,
         args,
         signal: this.abortController.signal,
       })
+      if (error) {
+        results.push(error as Error)
+        return results
+      }
       args = this.buildNextScriptParams(data!, {
         scriptPath,
         envEntries,
         env,
         argsEntries,
       }).args
-      index++
-    }
+      results.push(1)
+      return results
+    }, [])
   }
 
   private serialize(scriptDefEnv: Omit<ScriptDef['env'], 'inherit'>) {
@@ -158,20 +179,26 @@ export class Pipet {
     }
   }
 
-  private spawnDeez(
-    modulePath: string,
+  private spawn(
+    scriptPath: string,
+    bin: Required<PipetOptions>['bin'],
+    binArgs: Required<PipetOptions>['binArgs'],
     options?: childProcess.SpawnOptions & {
       args?: string[]
     },
   ) {
-    const args = [modulePath].concat(options?.args ?? [])
-    const { output } = childProcess.spawnSync('node', args, {
-      encoding: 'utf-8',
-      env: options?.env,
-      signal: options?.signal,
-    })
-    const [data] = output.filter(Boolean)
-    return { data }
+    try {
+      const args = binArgs.concat(scriptPath, options?.args ?? [])
+      const { output } = childProcess.spawnSync(bin, args, {
+        encoding: 'utf-8',
+        env: options?.env,
+        signal: options?.signal,
+      })
+      const [data] = output.filter(Boolean)
+      return { data, error: null }
+    } catch (error) {
+      return { data: null, error }
+    }
   }
 
   private buildFromGlobalMatch(
@@ -242,18 +269,38 @@ export class Pipet {
     return { args }
   }
 
+  private isScriptDef(runnable: RunnableDef): runnable is ScriptDef {
+    return 'script' in runnable
+  }
+
   private toDashCase(value: string) {
     return value.replace(/([A-Z])/g, '-$1').toLowerCase()
   }
 }
 
-export function script<
-  Script extends string,
-  Env extends ScriptEnv = ScriptEnv,
->(script: Script, env?: Env, next?: Next): ScriptDef<Script, Env> {
-  return {
-    script,
-    env,
-    next,
-  }
+/** Utility functions map */
+export const U = {
+  log(message: string) {
+    return torn(process.stdout.write.bind(process.stdout, message + '\n'))
+  },
+}
+
+/** Builder functions map */
+export const B = {
+  script<Script extends string, Env extends ScriptEnv = ScriptEnv>(
+    script: Script,
+    env?: Env,
+    next?: Next,
+  ): ScriptDef<Script, Env> {
+    return {
+      script,
+      env,
+      next,
+    }
+  },
+} as const
+
+/** alias for `toRunnable` */
+function torn(cb: (...args: any[]) => any) {
+  return () => cb()
 }
