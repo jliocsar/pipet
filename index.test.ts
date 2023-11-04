@@ -8,10 +8,10 @@ new Pipet().run(
   [
     B.script('scriptpath.js', env, {
       args: {
-        countResult: {
+        'count-result': {
           match: /Count is (.+) and (.+)/,
           csv: true,
-          // abortEarly: true,
+          continueEarly: true,
         },
       },
     }),

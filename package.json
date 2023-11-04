@@ -1,5 +1,5 @@
 {
-  "name": "pipet",
+  "name": "@jliocsar/pipet",
   "version": "0.0.1",
   "main": "pipet.ts",
   "license": "MIT",

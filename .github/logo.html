@@ -5,14 +5,14 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700;800&display=swap"
+      href="https://fonts.googleapis.com/css2?family=K2D:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;1,100;1,200;1,300;1,400;1,500;1,600;1,700&display=swap"
       rel="stylesheet"
     />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Document</title>
     <style>
       html {
-        font-family: Nanum Gothic;
+        font-family: K2D;
       }
 
       html,
@@ -31,11 +31,16 @@
       }
 
       .icon {
-        font-size: 8rem;
+        position: absolute;
+        left: -3rem;
+        top: 1.4rem;
+        font-size: 6rem;
         margin-top: 2rem;
+        text-shadow: 0 0 1rem rgba(255, 255, 255, 0.3);
       }
 
       .logo-wrapper {
+        position: relative;
         display: flex;
         flex-direction: column;
         justify-content: end;
@@ -55,9 +60,10 @@
           hsl(241deg 96% 18%) 61%,
           hsl(243deg 90% 17%) 71%,
           hsl(241deg 89% 20%) 78%,
-          hsl(236deg 90% 27%) 84%,
+          hsl(236deg 90% 23%) 82%,
+          hsl(236deg 90% 27%) 86%,
           hsl(227deg 91% 34%) 90%,
-          hsl(208deg 91% 40%) 95%,
+          hsl(208deg 91% 40%) 96%,
           hsl(190deg 90% 46%) 100%
         );
       }
@@ -68,14 +74,17 @@
       }
 
       h1 {
+        text-shadow: 0 0 2rem rgba(255, 255, 255, 0.3);
         font-weight: 700;
-        font-size: 10rem;
+        font-size: 8rem;
         line-height: 0.2;
+        margin-left: 2rem;
       }
 
       p {
         font-size: 2rem;
-        font-weight: 400;
+        font-weight: 200;
+        font-style: italic;
         opacity: 0.6;
         margin: 0;
       }

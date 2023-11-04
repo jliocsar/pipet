@@ -118,13 +118,14 @@ export class Pipet {
     const cwd = options?.cwd ?? process.cwd()
     const bin = options?.bin ?? 'node'
     const binArgs = options?.binArgs ?? []
+    const results: (1 | Error)[] = []
     // Args isn't accumulated as env
     let args: string[] = []
-    return runnables.reduce<(1 | Error)[]>((results, runnableDef) => {
+    for (const runnableDef of runnables) {
       if (!this.isScriptDef(runnableDef)) {
         runnableDef()
         results.push(1)
-        return results
+        continue
       }
       if (runnableDef.env && runnableDef.env !== 'inherit') {
         Object.assign(this.env, this.serialize(runnableDef.env))
@@ -138,29 +139,32 @@ export class Pipet {
         : []
       let data = ''
       try {
-        this.spawn(scriptPath, bin, binArgs, {
+        await this.spawn(scriptPath, bin, binArgs, {
           env: this.env,
           args,
           signal: this.abortController.signal,
-          onData: chunk => {
-            const chunkData = chunk.toString()
-            data += chunkData
-            args = this.buildNextScriptParams(chunkData, {
-              scriptPath,
-              envEntries,
-              env: this.env,
-              argsEntries,
-            }).args
+          onData: (chunk, child) => {
+            const { args: nextArgs, continueEarly } =
+              this.buildNextScriptParams((data += chunk), {
+                scriptPath,
+                envEntries,
+                env: this.env,
+                child,
+                argsEntries,
+              })
+            args = nextArgs
+            return { continueEarly }
           },
         })
         Object.assign(this.env, runnableDef.next?.decorateEnv?.(this.env) ?? {})
         results.push(1)
-        return results
       } catch (error) {
-        results.push(error as Error)
-        return results
+        const pipetError = new PipetError((error as Error).message)
+        console.error(pipetError)
+        results.push(pipetError)
       }
-    }, [])
+    }
+    return results
   }
 
   private serialize(scriptDefEnv: Omit<ScriptDef['env'], 'inherit'>) {
@@ -207,34 +211,41 @@ export class Pipet {
     binArgs: Required<PipetOptions>['binArgs'],
     options?: childProcess.SpawnOptions & {
       args?: string[]
-      onData?(data: string): void
+      onData?(
+        data: string,
+        child: childProcess.ChildProcessWithoutNullStreams,
+      ): { continueEarly?: boolean }
     },
   ) {
-    try {
-      const args = binArgs.concat(scriptPath, options?.args ?? [])
-      const child = childProcess.spawn(bin, args, {
-        env: options?.env,
-        signal: options?.signal,
-      })
-      child.stdout
-        .on('data', options?.onData ?? timers.setImmediate)
-        .on('error', error => {
-          throw error
-        })
-      // return { data: '', error: null }
-      // const { output } = childProcess.spawnSync(bin, args, {
-      //   encoding: 'utf-8',
-      //   env: options?.env,
-      //   signal: options?.signal,
-      // })
-      // const [data] = output.filter(Boolean)
-      // return { data, error: null }
-    } catch (error) {
-      return { data: null, error }
-    }
+    return new Promise<void>((resolve, reject) => {
+      try {
+        const args = binArgs.concat(scriptPath, options?.args ?? [])
+        const child = childProcess
+          .spawn(bin, args, {
+            env: options?.env,
+            signal: options?.signal,
+          })
+          .on('error', reject)
+        child.stdout
+          .on('data', data => {
+            process.stdout.write(data)
+            if (data && options?.onData) {
+              const { continueEarly } = options.onData(data.toString(), child)
+              if (continueEarly) {
+                return resolve()
+              }
+            }
+          })
+          .on('error', reject)
+          .on('close', resolve)
+      } catch (error) {
+        return reject(error)
+      }
+    })
   }
 
   private buildFromGlobalMatch(
+    child: childProcess.ChildProcessWithoutNullStreams,
     data: string,
     entries: [string, NextEnvDef | NextArgDef][],
   ) {
@@ -255,11 +266,11 @@ export class Pipet {
           map[key] = def.value
         }
         if (def.continueEarly) {
-          return map
+          return { continueEarly: true, map }
         }
         if (def.abortEarly) {
-          this.abortController.abort()
-          return map
+          child.kill('SIGKILL')
+          return { continueEarly: true, map }
         }
         index++
         continue
@@ -278,36 +289,53 @@ export class Pipet {
           map[key] = joined
         }
         if (def.continueEarly) {
-          return map
+          return { continueEarly: true, map }
         }
         if (def.abortEarly) {
-          this.abortController.abort()
-          return map
+          child.kill('SIGKILL')
+          return { continueEarly: true, map }
         }
       }
       index++
     }
-    return map
+    return { map }
+  }
+
+  private handleDefValue<Def extends NextEnvDef | NextArgDef>(
+    map: NodeJS.ProcessEnv,
+    child: childProcess.ChildProcessWithoutNullStreams,
+    def: Def,
+    key: string,
+    value: string,
+  ) {
+    if (def.csv && map[key]) {
+      map[key] += `,${value}`
+    } else {
+      map[key] = value
+    }
+    if (def.continueEarly) {
+      return { continueEarly: true, map }
+    }
+    if (def.abortEarly) {
+      child.kill('SIGKILL')
+      return { continueEarly: true, map }
+    }
   }
 
   private buildNextScriptParams(
     data: string,
     params: {
+      child: childProcess.ChildProcessWithoutNullStreams
       scriptPath: string
       envEntries: NextEnvEntry[]
       env: NodeJS.ProcessEnv
       argsEntries: NextArgEntry[]
     },
   ) {
-    process.stdout.write(data)
-    const argsMap = this.buildFromGlobalMatch(data, params.argsEntries)
+    const { continueEarly: argsContinueEarly, map: argsMap } =
+      this.buildFromGlobalMatch(params.child, data, params.argsEntries)
     const args: string[] = []
     this.checkRequiredFields(params.scriptPath, params.argsEntries, argsMap)
-    Object.assign(
-      params.env,
-      this.buildFromGlobalMatch(data, params.envEntries),
-    )
-    this.checkRequiredFields(params.scriptPath, params.envEntries, params.env)
     const length = params.argsEntries.length
     let index = 0
     while (index < length) {
@@ -328,7 +356,14 @@ export class Pipet {
       args.push(`${prefix}${key}${equality}${mapped}`)
       index++
     }
-    return { args }
+    if (argsContinueEarly) {
+      return { args, continueEarly: true }
+    }
+    const { continueEarly: envContinueEarly, map: env } =
+      this.buildFromGlobalMatch(params.child, data, params.envEntries)
+    Object.assign(params.env, env)
+    this.checkRequiredFields(params.scriptPath, params.envEntries, params.env)
+    return { args, continueEarly: envContinueEarly }
   }
 
   private isScriptDef(runnable: RunnableDef): runnable is ScriptDef {

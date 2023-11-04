@@ -11,3 +11,55 @@
 ## Introduction
 
 🏗️ W.I.P. 🏗️
+
+## Example
+
+```js
+import { Pipet, B, U } from '@jliocsar/pipet'
+
+const env = {
+  count: 0,
+}
+
+const pipet = new Pipet()
+
+pipet.run(
+  [
+    B.script('scriptpath.js', env, {
+      args: {
+        'count-result': {
+          match: /Count is (.+) and (.+)/,
+          csv: true,
+          continueEarly: true,
+        },
+      },
+    }),
+    U.log('hello'),
+    B.script('scriptpath.js', null, {
+      env: {
+        countResult: {
+          match: /Count is (.+) and (.+)/,
+          csv: true,
+        },
+      },
+    }),
+    B.script('scriptpath.js', env),
+    B.script('scriptpath.js', null, {
+      args: {
+        $: {
+          match: /Count is (.+) and (.+)/,
+          csv: true,
+          separator: ' ',
+        },
+      },
+    }),
+    B.script('scriptpath.js', env),
+  ],
+  {
+    binArgs: ['--title=hello'],
+    afterRun() {
+      console.log('hehe')
+    },
+  },
+)
+```
