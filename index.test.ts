@@ -38,6 +38,7 @@ new Pipet().run(
   ],
   {
     binArgs: ['--title=hello'],
+    async beforeRun() {},
     afterRun() {
       console.log('hehe')
     },

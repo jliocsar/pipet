@@ -12,6 +12,14 @@
 
 🏗️ W.I.P. 🏗️
 
+> _**t**erminal **pipe**_ **=** `pipet`
+
+Pipet is a script running framework, providing an easy way to build different script input with different arguments/environment variables based on the output from the previous scripts.
+
+It acts as a pipeline with different ways of formatting/parsing the piped input values, also allowing you to manipulate the script behavior itself (i.e. aborting the script before it finishes whenever it matches a printed value).
+
+It's also built with TypeScript, so Pipet is really easy to learn and master.
+
 ## Example
 
 ```js
@@ -25,8 +33,9 @@ const pipet = new Pipet()
 
 pipet.run(
   [
-    B.script('scriptpath.js', env, {
+    B.script('first-script-path.ts', env, {
       args: {
+        // Will pass `--count-result=...` to the next script
         'count-result': {
           match: /Count is (.+) and (.+)/,
           csv: true,
@@ -35,17 +44,19 @@ pipet.run(
       },
     }),
     U.log('hello'),
-    B.script('scriptpath.js', null, {
+    B.script('second-script-path.ts', null, {
       env: {
+        // Will add `countResult` as an env. variable
+        // on the next script
         countResult: {
           match: /Count is (.+) and (.+)/,
           csv: true,
         },
       },
     }),
-    B.script('scriptpath.js', env),
-    B.script('scriptpath.js', null, {
+    B.script('last-script-path.ts', null, {
       args: {
+        // Will pass `...matched[]` as arguments to the next script
         $: {
           match: /Count is (.+) and (.+)/,
           csv: true,
@@ -53,13 +64,19 @@ pipet.run(
         },
       },
     }),
-    B.script('scriptpath.js', env),
   ],
   {
-    binArgs: ['--title=hello'],
-    afterRun() {
-      console.log('hehe')
-    },
+    bin: 'tsx', // Default is 'node'
+    binArgs: ['--your-bin-arg'],
+    async beforeRun() {
+      // ... your build
+    }
   },
 )
 ```
+
+## TODO
+
+- [ ] npm publish;
+- [ ] Allow different `bin` for each script;
+- [ ] Finish docs.
