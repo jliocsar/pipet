@@ -20,6 +20,25 @@ It acts as a pipeline with different ways of formatting/parsing the piped input 
 
 It's also built with TypeScript, so Pipet is really easy to learn and master.
 
+## Usage
+
+### Builder (`B`)
+
+The `B` namespace exports all utility functions used for building your scripts pipeline.
+
+
+#### `B.scripts`
+
+Builds the script definition object used in the script pipeline.
+
+### Utilities (`U`)
+
+The `U` namespace exports all utility functions that can be used during your pipeline process (i.e. logging something before affecting the script environment).
+
+#### `U.log`
+
+Logs a message to the terminal between scripts in the pipeline.
+
 ## Example
 
 ```js
