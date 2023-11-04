@@ -1,5 +1,6 @@
 import * as path from 'node:path'
 import * as childProcess from 'node:child_process'
+import * as timers from 'node:timers'
 
 type Dict<T> = {
   [key: string]: T
@@ -15,6 +16,8 @@ type Next = {
       value?: string
       required?: boolean
       csv?: boolean
+      abortEarly?: boolean
+      continueEarly?: boolean
       /** @default '--' */
       prefix?: '-' | '--' | '' | (string & {})
       /** @default '=' */
@@ -29,6 +32,8 @@ type Next = {
       value?: string
       required?: boolean
       csv?: boolean
+      abortEarly?: boolean
+      continueEarly?: boolean
       /** @default ',' */
       separator?: string
     }
@@ -106,10 +111,10 @@ export class Pipet {
     return results
   }
 
-  private reduce<Runnables extends RunnableDef[], Options extends PipetOptions>(
-    runnables: Runnables,
-    options?: Options,
-  ) {
+  private async reduce<
+    Runnables extends RunnableDef[],
+    Options extends PipetOptions,
+  >(runnables: Runnables, options?: Options) {
     const cwd = options?.cwd ?? process.cwd()
     const bin = options?.bin ?? 'node'
     const binArgs = options?.binArgs ?? []
@@ -131,24 +136,30 @@ export class Pipet {
       const argsEntries = runnableDef.next?.args
         ? Object.entries(runnableDef.next.args)
         : []
-      const { data, error } = this.spawn(scriptPath, bin, binArgs, {
-        env: this.env,
-        args,
-        signal: this.abortController.signal,
-      })
-      if (error) {
+      let data = ''
+      try {
+        this.spawn(scriptPath, bin, binArgs, {
+          env: this.env,
+          args,
+          signal: this.abortController.signal,
+          onData: chunk => {
+            const chunkData = chunk.toString()
+            data += chunkData
+            args = this.buildNextScriptParams(chunkData, {
+              scriptPath,
+              envEntries,
+              env: this.env,
+              argsEntries,
+            }).args
+          },
+        })
+        Object.assign(this.env, runnableDef.next?.decorateEnv?.(this.env) ?? {})
+        results.push(1)
+        return results
+      } catch (error) {
         results.push(error as Error)
         return results
       }
-      args = this.buildNextScriptParams(data!, {
-        scriptPath,
-        envEntries,
-        env: this.env,
-        argsEntries,
-      }).args
-      Object.assign(this.env, runnableDef.next?.decorateEnv?.(this.env) ?? {})
-      results.push(1)
-      return results
     }, [])
   }
 
@@ -196,17 +207,28 @@ export class Pipet {
     binArgs: Required<PipetOptions>['binArgs'],
     options?: childProcess.SpawnOptions & {
       args?: string[]
+      onData?(data: string): void
     },
   ) {
     try {
       const args = binArgs.concat(scriptPath, options?.args ?? [])
-      const { output } = childProcess.spawnSync(bin, args, {
-        encoding: 'utf-8',
+      const child = childProcess.spawn(bin, args, {
         env: options?.env,
         signal: options?.signal,
       })
-      const [data] = output.filter(Boolean)
-      return { data, error: null }
+      child.stdout
+        .on('data', options?.onData ?? timers.setImmediate)
+        .on('error', error => {
+          throw error
+        })
+      // return { data: '', error: null }
+      // const { output } = childProcess.spawnSync(bin, args, {
+      //   encoding: 'utf-8',
+      //   env: options?.env,
+      //   signal: options?.signal,
+      // })
+      // const [data] = output.filter(Boolean)
+      // return { data, error: null }
     } catch (error) {
       return { data: null, error }
     }
@@ -232,6 +254,13 @@ export class Pipet {
         } else {
           map[key] = def.value
         }
+        if (def.continueEarly) {
+          return map
+        }
+        if (def.abortEarly) {
+          this.abortController.abort()
+          return map
+        }
         index++
         continue
       }
@@ -247,6 +276,13 @@ export class Pipet {
           map[key] += `,${joined}`
         } else {
           map[key] = joined
+        }
+        if (def.continueEarly) {
+          return map
+        }
+        if (def.abortEarly) {
+          this.abortController.abort()
+          return map
         }
       }
       index++

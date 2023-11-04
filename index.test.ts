@@ -11,6 +11,7 @@ new Pipet().run(
         countResult: {
           match: /Count is (.+) and (.+)/,
           csv: true,
+          // abortEarly: true,
         },
       },
     }),
