@@ -8,19 +8,26 @@ new Pipet().run(
   [
     B.script('scriptpath.js', env, {
       args: {
-        'count-result': {
-          match: /Count is (.+) and (.+)/,
-          csv: true,
-          abortEarly: true,
+        version: {
+          boolean: true,
         },
       },
     }),
+    B.bin('jstr'),
     U.log('Hello world'),
     B.script('scriptpath.js', null, {
       env: {
         countResult: {
           match: /Count is (.+) and (.+)/,
-          csv: true,
+          array: true,
+        },
+      },
+    }),
+    B.script('scriptpath.js', null, {
+      env: {
+        countResult: {
+          match: /Count is (.+) and (.+)/,
+          array: true,
         },
       },
     }),
@@ -29,7 +36,7 @@ new Pipet().run(
       args: {
         $: {
           match: /Count is (.+) and (.+)/,
-          csv: true,
+          array: true,
           separator: ' ',
         },
       },

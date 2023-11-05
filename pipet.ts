@@ -9,6 +9,8 @@ type StringIndex<T extends Dict<any>> = T[string]
 type Nullable<T> = T | null
 type Promiseable<T> = T | Promise<T>
 
+const BIN = Symbol('BIN')
+
 type BinOptions = {
   /** @default process.cwd() */
   cwd?: string
@@ -21,20 +23,30 @@ type ValueDef = {
   match?: RegExp
   value?: string
   required?: boolean
-  csv?: boolean
+  array?: boolean
   abortEarly?: boolean
   continueEarly?: boolean
 }
-type Next = {
+type ArgDef = Omit<ValueDef, 'array'> & {
+  /** @default '--' */
+  prefix?: '-' | '--' | '' | (string & {})
+  /** @default '=' */
+  equality?: '=' | ' ' | '' | (string & {})
+  /** @default ',' */
+  separator?: ',' | ' ' | '' | (string & {})
+} & (
+    | {
+        boolean?: true
+        array?: never
+      }
+    | {
+        boolean?: never
+        array?: true
+      }
+  )
+type NextDef = {
   args?: {
-    [argKey: '$' | string]: ValueDef & {
-      /** @default '--' */
-      prefix?: '-' | '--' | '' | (string & {})
-      /** @default '=' */
-      equality?: '=' | ' ' | '' | (string & {})
-      /** @default ',' */
-      separator?: ',' | ' ' | '' | (string & {})
-    }
+    [argKey: '$' | string]: ArgDef
   }
   env?: {
     [envKey: string]: ValueDef & {
@@ -44,8 +56,8 @@ type Next = {
   }
   decorateEnv?(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv
 }
-type NextEnvDef = StringIndex<Required<Next>['env']>
-type NextArgDef = StringIndex<Required<Next>['args']>
+type NextEnvDef = StringIndex<Required<NextDef>['env']>
+type NextArgDef = StringIndex<Required<NextDef>['args']>
 type NextEnvEntry = [EnvKey: string, NextEnvDef]
 type NextArgEntry = [EnvKey: string, NextArgDef]
 type RunnableDef =
@@ -53,14 +65,15 @@ type RunnableDef =
   | ScriptDef
 
 export type ScriptEnv = Nullable<Dict<any> | NodeJS.ProcessEnv | 'inherit'>
-export type ScriptArgs = Nullable<Next['args']>
+export type ScriptArgs = Nullable<NextDef['args']>
 export type ScriptDef<
   Script extends string = string,
   Env extends ScriptEnv = ScriptEnv,
   Args extends ScriptArgs = ScriptArgs,
 > = BinOptions & {
+  readonly [BIN]?: boolean
   script: Script
-  next?: Next
+  next?: NextDef
   args?: Args
   /** @default 'inherit' */
   env?: Env
@@ -127,13 +140,9 @@ export class Pipet {
         index++
         continue
       }
-      const cwd = options?.cwd ?? runnableDef.cwd ?? process.cwd()
-      const bin = options?.bin ?? runnableDef.bin ?? 'node'
-      const binArgs = options?.binArgs ?? runnableDef.binArgs ?? []
       if (runnableDef.env && runnableDef.env !== 'inherit') {
         Object.assign(this.env, this.serialize(runnableDef.env))
       }
-      const scriptPath = path.resolve(cwd, runnableDef.script)
       const envEntries = runnableDef.next?.env
         ? Object.entries(runnableDef.next.env)
         : []
@@ -142,7 +151,7 @@ export class Pipet {
         : []
       let data = ''
       try {
-        await this.spawn(scriptPath, bin, binArgs, {
+        await this.spawn(runnableDef, {
           env: this.env,
           args,
           signal: this.abortController.signal,
@@ -152,7 +161,7 @@ export class Pipet {
               continueEarly,
               abortEarly,
             } = this.buildNextScriptParams((data += chunk), {
-              scriptPath,
+              label: runnableDef.script,
               envEntries,
               env: this.env,
               argsEntries,
@@ -194,7 +203,7 @@ export class Pipet {
   }
 
   private checkRequiredFields(
-    scriptPath: string,
+    label: string,
     entries: (NextEnvEntry | NextArgEntry)[],
     map: NodeJS.ProcessEnv,
   ) {
@@ -204,25 +213,38 @@ export class Pipet {
       const [key, def] = entries[index]
       if (def.required && [undefined, ''].includes(map[key])) {
         throw new PipetError(
-          `Required key "${key}" is not set after running script "${scriptPath}"`,
+          `Required key "${key}" is not set after running script "${label}"`,
         )
       }
       index++
     }
   }
 
-  private spawn(
-    scriptPath: string,
-    bin: Required<PipetOptions>['bin'],
-    binArgs: Required<PipetOptions>['binArgs'],
-    options?: childProcess.SpawnOptions & {
-      args?: string[]
-      onData?(data: string): { continueEarly?: boolean; abortEarly?: boolean }
-    },
+  private spawn<Options extends PipetOptions>(
+    scriptDef: ScriptDef,
+    options?: childProcess.SpawnOptions &
+      Options & {
+        args?: string[]
+        onData?(data: string): { continueEarly?: boolean; abortEarly?: boolean }
+      },
   ) {
     return new Promise<void>((resolve, reject) => {
       try {
-        const args = binArgs.concat(scriptPath, options?.args ?? [])
+        const cwd = options?.cwd ?? scriptDef.cwd ?? process.cwd()
+        const binArgs = options?.binArgs ?? scriptDef.binArgs ?? []
+        let bin = null
+        let args = null
+        if (scriptDef[BIN]) {
+          bin = scriptDef.script
+          args = binArgs.concat(options?.args ?? [])
+        } else {
+          bin = options?.bin ?? scriptDef.bin ?? 'node'
+          args = binArgs.concat(
+            path.resolve(cwd, scriptDef.script),
+            options?.args ?? [],
+          )
+        }
+
         const child = childProcess
           .spawn(bin, args, {
             env: options?.env,
@@ -262,13 +284,8 @@ export class Pipet {
     let index = 0
     while (index < length) {
       const [key, def] = entries[index]
-      if (!def.value && !def.match) {
-        throw new PipetError(
-          `Next entry "${key}" is missing a \`value\` or \`match\` property`,
-        )
-      }
       if (def.value) {
-        if (def.csv && map[key]) {
+        if (def.array && map[key]) {
           map[key] += `,${def.value}`
         } else {
           map[key] = def.value
@@ -282,7 +299,11 @@ export class Pipet {
         index++
         continue
       }
-      const regex = def.match!.global ? def.match! : new RegExp(def.match!, 'g')
+      if (!def.match) {
+        index++
+        continue
+      }
+      const regex = def.match.global ? def.match : new RegExp(def.match!, 'g')
       const match = data.matchAll(regex)
       if (!match) {
         index++
@@ -290,7 +311,7 @@ export class Pipet {
       }
       for (const [, ...value] of match) {
         const joined = value.join(def.separator ?? ',')
-        if (def.csv && map[key]) {
+        if (def.array && map[key]) {
           map[key] += `,${joined}`
         } else {
           map[key] = joined
@@ -310,7 +331,7 @@ export class Pipet {
   private buildNextScriptParams(
     data: string,
     params: {
-      scriptPath: string
+      label: string
       envEntries: NextEnvEntry[]
       env: NodeJS.ProcessEnv
       argsEntries: NextArgEntry[]
@@ -322,7 +343,7 @@ export class Pipet {
       map: argsMap,
     } = this.buildFromGlobalMatch(data, params.argsEntries)
     const args: string[] = []
-    this.checkRequiredFields(params.scriptPath, params.argsEntries, argsMap)
+    this.checkRequiredFields(params.label, params.argsEntries, argsMap)
     const length = params.argsEntries.length
     let index = 0
     while (index < length) {
@@ -330,7 +351,7 @@ export class Pipet {
       const mapped = argsMap[key]
       if (value.required && [undefined, null, ''].includes(mapped)) {
         throw new PipetError(
-          `Required arg "${key}" is not set after running script "${params.scriptPath}"`,
+          `Required arg "${key}" is not set after running script "${params.label}"`,
         )
       }
       if (key === '$') {
@@ -339,8 +360,12 @@ export class Pipet {
         continue
       }
       const prefix = value.prefix ?? '--'
-      const equality = value.equality ?? '='
-      args.push(`${prefix}${key}${equality}${mapped}`)
+      if (value.boolean) {
+        args.push(`${prefix}${key}`)
+      } else {
+        const equality = value.equality ?? '='
+        args.push(`${prefix}${key}${equality}${mapped}`)
+      }
       index++
     }
     if (argsContinueEarly || argsAbortEarly) {
@@ -356,7 +381,7 @@ export class Pipet {
       map: env,
     } = this.buildFromGlobalMatch(data, params.envEntries)
     Object.assign(params.env, env)
-    this.checkRequiredFields(params.scriptPath, params.envEntries, params.env)
+    this.checkRequiredFields(params.label, params.envEntries, params.env)
     return { args, continueEarly: envContinueEarly, abortEarly: envAbortEarly }
   }
 
@@ -368,22 +393,34 @@ export class Pipet {
 /** Utility functions map */
 export const U = {
   log(message: string) {
-    return torn(() => process.stdout.write(message + '\n'))
+    return torun(() => process.stdout.write(message + '\n'))
   },
   tap<T>(cb: (value: T) => void | Promise<void>) {
-    return torn(cb)
+    return torun(cb)
   },
   sleep(seconds: number) {
-    return torn(() => timers.setTimeout(seconds * 1000))
+    return torun(() => timers.setTimeout(seconds * 1000))
   },
-}
+} as const
 
 /** Builder functions map */
 export const B = {
+  bin<Bin extends string, Env extends ScriptEnv = ScriptEnv>(
+    bin: Bin,
+    env?: Env,
+    next?: NextDef,
+  ): ScriptDef<Bin, Env> {
+    return {
+      [BIN]: true,
+      script: bin,
+      env,
+      next,
+    }
+  },
   script<Script extends string, Env extends ScriptEnv = ScriptEnv>(
     script: Script,
     env?: Env,
-    next?: Next,
+    next?: NextDef,
   ): ScriptDef<Script, Env> {
     return {
       script,
@@ -394,6 +431,6 @@ export const B = {
 } as const
 
 /** alias for `toRunnable` */
-function torn<A extends any[]>(cb: (...args: A) => any) {
+function torun<A extends any[]>(cb: (...args: A) => any) {
   return (...args: A) => cb(...args)
 }

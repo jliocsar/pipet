@@ -29,7 +29,11 @@ The `B` namespace exports all utility functions used for building your scripts p
 
 #### `B.scripts`
 
-Builds the script definition object used in the script pipeline.
+Builds the script definition object used in the script pipeline based on the script path.
+
+#### `B.bin`
+
+Builds the script definition object used in the script pipeline based on a CLI binary.
 
 ### Utilities (`U`)
 
@@ -65,11 +69,12 @@ pipet.run(
         // Will pass `--count-result=...` to the next script
         'count-result': {
           match: /Count is (.+) and (.+)/,
-          csv: true,
+          array: true,
           continueEarly: true,
         },
       },
     }),
+    B.bin('my-binary', env),
     U.log('hello'),
     B.script('second-script-path.ts', null, {
       env: {
@@ -87,7 +92,7 @@ pipet.run(
         // Will pass `...matched[]` as arguments to the next script
         $: {
           match: /countResult is (.+) and (.+)/,
-          csv: true,
+          array: true,
           separator: ' ',
         },
       },
