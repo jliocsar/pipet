@@ -1,16 +1,19 @@
 {
   "name": "@jliocsar/pipet",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "main": "pipet.ts",
   "license": "MIT",
   "scripts": {
     "prepublish": "yarn build",
     "test": "tsx index.test.ts",
-    "build": "tsc -p ."
+    "build": "typedoc && tsc -p .",
+    "serve": "serve -p 3000 docs"
   },
   "devDependencies": {
     "@types/node": "latest",
+    "serve": "latest",
     "tsx": "latest",
+    "typedoc": "latest",
     "typescript": "latest"
   }
 }

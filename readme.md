@@ -54,11 +54,11 @@ Builds the script definition object used in the script pipeline based on a CLI b
 
 #### `B.decorateEnv`
 
-Exposes an injector function to decorate the env. variables of the next scripts.
+Exposes an async injector function to decorate the env. variables of the next scripts.
 
 #### `B.decorateArgs`
 
-Exposes an injector function to decorate the args array of the next script.
+Exposes an async injector function to decorate the args array of the next script.
 
 ### Utilities (`U`)
 
@@ -99,10 +99,10 @@ pipet.run(
         },
       },
     }),
-    B.decorateArgs(args => args.concat('--another-argument')),
+    B.decorateArgs(async args => args.concat('--another-argument')),
     B.bin('my-binary', env),
     U.log('hello'),
-    B.decorateEnv(env => {
+    B.decorateEnv(async env => {
       env.countResult = '420'
     }),
     B.script('second-script-path.ts', null, {
@@ -132,6 +132,9 @@ pipet.run(
     binArgs: ['--your-bin-arg'],
     async beforeRun() {
       // ... your build
+    },
+    async afterRun() {
+      // ... clean up effect
     }
   },
 )

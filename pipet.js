@@ -1,7 +1,9 @@
 import * as path from 'node:path';
 import * as childProcess from 'node:child_process';
 import * as timers from 'node:timers/promises';
+/** @internal */
 const BIN = Symbol('BIN');
+/** @internal */
 const INJECT = Symbol('INJECT');
 class PipetError extends Error {
     constructor(message) {
@@ -44,10 +46,10 @@ export class Pipet {
             if (!this.isScriptDef(runnableDef)) {
                 if (this.isInject(runnableDef)) {
                     if ('env' in runnableDef) {
-                        Object.assign(this.env, runnableDef.env(this.env));
+                        Object.assign(this.env, await runnableDef.env(this.env));
                     }
                     else if (runnableDef.args) {
-                        this.args = runnableDef.args(this.args);
+                        this.args = await runnableDef.args(this.args);
                     }
                     index++;
                     continue;
@@ -265,32 +267,34 @@ export class Pipet {
         return INJECT in runnable;
     }
 }
-/** Utility functions map */
-export const U = {
+class Utility {
     log(message) {
-        return torun(() => process.stdout.write(message + '\n'));
-    },
+        return this.torun(() => process.stdout.write(message + '\n'));
+    }
     tap(cb) {
-        return torun(cb);
-    },
+        return this.torun(cb);
+    }
     sleep(seconds) {
-        return torun(() => timers.setTimeout(seconds * 1000));
-    },
-};
-/** Builder functions map */
-export const B = {
+        return this.torun(() => timers.setTimeout(seconds * 1000));
+    }
+    /** alias for `toRunnable` */
+    torun(cb) {
+        return (...args) => cb(...args);
+    }
+}
+class Builder {
     decorateEnv(env) {
         return {
             [INJECT]: true,
             env,
         };
-    },
+    }
     decorateArgs(args) {
         return {
             [INJECT]: true,
             args,
         };
-    },
+    }
     bin(bin, env, next) {
         return {
             [BIN]: true,
@@ -298,16 +302,16 @@ export const B = {
             env,
             next,
         };
-    },
+    }
     script(script, env, next) {
         return {
             script,
             env,
             next,
         };
-    },
-};
-/** alias for `toRunnable` */
-function torun(cb) {
-    return (...args) => cb(...args);
+    }
 }
+/** Builder functions map */
+export const B = new Builder();
+/** Utility functions map */
+export const U = new Utility();

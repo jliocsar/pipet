@@ -9,10 +9,12 @@ type StringIndex<T extends Dict<any>> = T[string]
 type Nullable<T> = T | null
 type Promiseable<T> = T | Promise<T>
 
+/** @internal */
 const BIN = Symbol('BIN')
+/** @internal */
 const INJECT = Symbol('INJECT')
 
-type BinOptions = {
+export type BinOptions = {
   /** @default process.cwd() */
   cwd?: string
   /** @default 'node' */
@@ -20,7 +22,7 @@ type BinOptions = {
   /** @default [] */
   binArgs?: string[]
 }
-type ValueDef = {
+export type ValueDef = {
   match?: RegExp
   value?: string
   required?: boolean
@@ -28,15 +30,17 @@ type ValueDef = {
   abortEarly?: boolean
   continueEarly?: boolean
 }
-type InjectEnvDef<Env extends ScriptEnv = ScriptEnv> = {
-  [INJECT]: true
-  env: (env: NodeJS.ProcessEnv) => Env
+export type InjectEnvDef<Env extends ScriptEnv = ScriptEnv> = {
+  /** @internal */
+  readonly [INJECT]: true
+  env: (env: NodeJS.ProcessEnv) => Promiseable<Env>
 }
-type InjectArgsDef<Args extends string[] = string[]> = {
-  [INJECT]: true
-  args: (args: string[]) => Args
+export type InjectArgsDef<Args extends string[] = string[]> = {
+  /** @internal */
+  readonly [INJECT]: true
+  args: (args: string[]) => Promiseable<Args>
 }
-type ArgDef = Omit<ValueDef, 'array'> & {
+export type ArgDef = Omit<ValueDef, 'array'> & {
   /** @default '--' */
   prefix?: '-' | '--' | '' | (string & {})
   /** @default '=' */
@@ -63,7 +67,7 @@ type NextDef = {
       separator?: string
     }
   }
-  decorateEnv?(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv
+  decorateEnv?(env: NodeJS.ProcessEnv): Promiseable<NodeJS.ProcessEnv>
 }
 type NextEnvDef = StringIndex<Required<NextDef>['env']>
 type NextArgDef = StringIndex<Required<NextDef>['args']>
@@ -82,6 +86,7 @@ export type ScriptDef<
   Env extends ScriptEnv = ScriptEnv,
   Args extends ScriptArgs = ScriptArgs,
 > = BinOptions & {
+  /** @internal */
   readonly [BIN]?: boolean
   script: Script
   next?: NextDef
@@ -90,14 +95,14 @@ export type ScriptDef<
   env?: Env
 }
 
-export type PipetHooks = {
+export type Hooks = {
   /** Runs before all scripts, useful for building etc */
   beforeRun?: () => Promiseable<void>
   /** Runs after all scripts, useful for any clean up */
   afterRun?: () => Promiseable<void>
 }
-export type PipetOptions = PipetHooks & BinOptions
-type SpawnOptions<Options extends PipetOptions> = childProcess.SpawnOptions &
+export type RunOptions = Hooks & BinOptions
+type SpawnOptions<Options extends RunOptions> = childProcess.SpawnOptions &
   Options & {
     args?: string[]
     onData?(data: string): { continueEarly?: boolean; abortEarly?: boolean }
@@ -124,7 +129,7 @@ export class Pipet {
     this.abortController = new AbortController()
   }
 
-  async run<Runnables extends RunnableDef[], Options extends PipetOptions>(
+  async run<Runnables extends RunnableDef[], Options extends RunOptions>(
     runnables: Runnables,
     options?: Options,
   ) {
@@ -144,7 +149,7 @@ export class Pipet {
 
   private async reduce<
     Runnables extends RunnableDef[],
-    Options extends PipetOptions,
+    Options extends RunOptions,
   >(runnables: Runnables, options?: Options) {
     const length = runnables.length
     const results: (1 | Error)[] = []
@@ -154,9 +159,9 @@ export class Pipet {
       if (!this.isScriptDef(runnableDef)) {
         if (this.isInject(runnableDef)) {
           if ('env' in runnableDef) {
-            Object.assign(this.env, runnableDef.env(this.env))
+            Object.assign(this.env, await runnableDef.env(this.env))
           } else if (runnableDef.args) {
-            this.args = runnableDef.args(this.args)
+            this.args = await runnableDef.args(this.args)
           }
           index++
           continue
@@ -249,7 +254,7 @@ export class Pipet {
     }
   }
 
-  private spawn<Options extends PipetOptions>(
+  private spawn<Options extends RunOptions>(
     scriptDef: ScriptDef,
     options?: childProcess.SpawnOptions &
       Options & {
@@ -425,37 +430,44 @@ export class Pipet {
   }
 }
 
-/** Utility functions map */
-export const U = {
+class Utility {
   log(message: string) {
-    return torun(() => process.stdout.write(message + '\n'))
-  },
-  tap<T>(cb: (value: T) => void | Promise<void>) {
-    return torun(cb)
-  },
-  sleep(seconds: number) {
-    return torun(() => timers.setTimeout(seconds * 1000))
-  },
-} as const
+    return this.torun(() => process.stdout.write(message + '\n'))
+  }
 
-/** Builder functions map */
-export const B = {
+  tap<T>(cb: (value: T) => void | Promise<void>) {
+    return this.torun(cb)
+  }
+
+  sleep(seconds: number) {
+    return this.torun(() => timers.setTimeout(seconds * 1000))
+  }
+
+  /** alias for `toRunnable` */
+  private torun<A extends any[]>(cb: (...args: A) => any) {
+    return (...args: A) => cb(...args)
+  }
+}
+
+class Builder {
   decorateEnv<Env extends ScriptEnv = ScriptEnv>(
-    env: (env: NodeJS.ProcessEnv) => Env,
+    env: (env: NodeJS.ProcessEnv) => Promiseable<Env>,
   ): InjectEnvDef<Env> {
     return {
       [INJECT]: true,
       env,
     }
-  },
+  }
+
   decorateArgs<Args extends string[] = string[]>(
-    args: (args: string[]) => Args,
+    args: (args: string[]) => Promiseable<Args>,
   ): InjectArgsDef<Args> {
     return {
       [INJECT]: true,
       args,
     }
-  },
+  }
+
   bin<Bin extends string, Env extends ScriptEnv = ScriptEnv>(
     bin: Bin,
     env?: Env,
@@ -467,7 +479,8 @@ export const B = {
       env,
       next,
     }
-  },
+  }
+
   script<Script extends string, Env extends ScriptEnv = ScriptEnv>(
     script: Script,
     env?: Env,
@@ -478,10 +491,10 @@ export const B = {
       env,
       next,
     }
-  },
-} as const
-
-/** alias for `toRunnable` */
-function torun<A extends any[]>(cb: (...args: A) => any) {
-  return (...args: A) => cb(...args)
+  }
 }
+
+/** Builder functions map */
+export const B = new Builder()
+/** Utility functions map */
+export const U = new Utility()

@@ -1,3 +1,4 @@
 scriptpath.js
 *.test.ts
 .github
+.config

@@ -176,3 +176,6 @@ dist
 
 # TS build files
 tsconfig.tsbuildinfo
+
+# Docs build output
+docs
