@@ -4,7 +4,7 @@
 
 > _**t**erminal **pipe**_ **=** `pipet`
 
-Pipet is a script running framework, providing an easy way to build different script input with different arguments/environment variables based on the output from the previous scripts.
+Pipet is a zero dependency script-running framework; it provides an easy way to build different script inputs with different arguments/environment variables based on the output from previous scripts (or just pure JS/TS). It supports any kind of binary/executable, meaning you can use scripts for any language you'd like.
 
 It acts as a pipeline with different ways of formatting/parsing the piped input values, also allowing you to manipulate the script behavior itself (i.e. aborting the script before it finishes whenever it matches a printed value).
 

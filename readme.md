@@ -2,9 +2,11 @@
 
 <img width=680 src=https://raw.githubusercontent.com/jliocsar/pipet/main/.github/logo.png>
 
-![npm (scoped)](https://img.shields.io/npm/v/%40jliocsar/pipet?style=for-the-badge&labelColor=4B4BB5&color=fff)
-![npm package minimized gzipped size (select exports)](https://img.shields.io/bundlejs/size/%40jliocsar%2Fpipet?style=for-the-badge&labelColor=4B4BB5&color=fff)
-![GitHub last commit (branch)](https://img.shields.io/github/last-commit/jliocsar/pipet/main?style=for-the-badge&labelColor=4B4BB5&color=fff)
+[![npm (scoped)](https://img.shields.io/npm/v/%40jliocsar/pipet?style=for-the-badge&labelColor=4B4BB5&color=fff)](https://npmjs.com/package/@jliocsar/pipet)
+[![npm package minimized gzipped size (select exports)](https://img.shields.io/bundlejs/size/%40jliocsar%2Fpipet?style=for-the-badge&labelColor=4B4BB5&color=fff)](#)
+[![GitHub last commit (branch)](https://img.shields.io/github/last-commit/jliocsar/pipet/main?style=for-the-badge&labelColor=4B4BB5&color=fff)](#)
+
+[![Read the docs](https://img.shields.io/badge/read%20the%20docs-fff?style=for-the-badge&color=4B4BB5)](https://pipet.vercel.app/)
 
 </div>
 
@@ -14,7 +16,7 @@
 
 > _**t**erminal **pipe**_ **=** `pipet`
 
-Pipet is a script running framework, providing an easy way to build different script input with different arguments/environment variables based on the output from the previous scripts.
+Pipet is a zero dependency script-running framework; it provides an easy way to build different script inputs with different arguments/environment variables based on the output from previous scripts (or just pure JS/TS). It supports any kind of binary/executable, meaning you can use scripts for any language you'd like.
 
 It acts as a pipeline with different ways of formatting/parsing the piped input values, also allowing you to manipulate the script behavior itself (i.e. aborting the script before it finishes whenever it matches a printed value).
 

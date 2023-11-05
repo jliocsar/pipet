@@ -1,7 +1,9 @@
 {
   "name": "@jliocsar/pipet",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "main": "pipet.ts",
+  "description": "Zero dependency script running framework",
+  "author": "JC (https://github.com/jliocsar)",
   "license": "MIT",
   "scripts": {
     "prepublish": "yarn build",
@@ -15,5 +17,23 @@
     "tsx": "latest",
     "typedoc": "latest",
     "typescript": "latest"
-  }
+  },
+  "keywords": [
+    "script",
+    "running",
+    "cli",
+    "environment",
+    "arguments"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/jliocsar/pipet.git"
+  },
+  "homepage": "https://pipet.vercel.app/",
+  "bugs": {
+    "url": "https://github.com/jliocsar/pipet/issues"
+  },
+  "contributors": [
+    "JC (https://github.com/jliocsar)"
+  ]
 }
