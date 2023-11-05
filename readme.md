@@ -1,10 +1,10 @@
 <div align=center>
 
-<img width=680 src=.github/logo.png>
+<img width=680 src=https://raw.githubusercontent.com/jliocsar/pipet/main/.github/logo.png>
 
-![GitHub repo size](https://img.shields.io/github/repo-size/jliocsar/pipet?style=for-the-badge&labelColor=4B4BB5&color=fff)
+![npm (scoped)](https://img.shields.io/npm/v/%40jliocsar/pipet?style=for-the-badge&labelColor=4B4BB5&color=fff)
+![npm package minimized gzipped size (select exports)](https://img.shields.io/bundlejs/size/%40jliocsar%2Fpipet?style=for-the-badge&labelColor=4B4BB5&color=fff)
 ![GitHub last commit (branch)](https://img.shields.io/github/last-commit/jliocsar/pipet/main?style=for-the-badge&labelColor=4B4BB5&color=fff)
-![GitHub package.json version (branch)](https://img.shields.io/github/package-json/v/jliocsar/pipet/main?style=for-the-badge&labelColor=4B4BB5&color=fff)
 
 </div>
 
@@ -20,6 +20,23 @@ It acts as a pipeline with different ways of formatting/parsing the piped input 
 
 It's also built with TypeScript, so Pipet is really easy to learn and master.
 
+## Installation
+
+The easiest way to use Pipet is installing it globally, so it's then available in all of your scripts:
+
+```sh
+# with npm
+npm i -g @jliocsar/pipet
+
+# with yarn
+yarn global add @jliocsar/pipet
+
+# with bun
+bun a -g @jliocsar/pipet
+```
+
+If you want to install it as a dependency for a single project, skip the global flag and add it to your `devDependencies`.
+
 ## Usage
 
 ### Builder (`B`)
@@ -34,6 +51,14 @@ Builds the script definition object used in the script pipeline based on the scr
 #### `B.bin`
 
 Builds the script definition object used in the script pipeline based on a CLI binary.
+
+#### `B.decorateEnv`
+
+Exposes an injector function to decorate the env. variables of the next scripts.
+
+#### `B.decorateArgs`
+
+Exposes an injector function to decorate the args array of the next script.
 
 ### Utilities (`U`)
 
@@ -74,8 +99,12 @@ pipet.run(
         },
       },
     }),
+    B.decorateArgs(args => args.concat('--another-argument')),
     B.bin('my-binary', env),
     U.log('hello'),
+    B.decorateEnv(env => {
+      env.countResult = '420'
+    }),
     B.script('second-script-path.ts', null, {
       env: {
         // Will add `countResult` as an env. variable
@@ -110,5 +139,4 @@ pipet.run(
 
 ## TODO
 
-- [ ] npm publish;
 - [ ] Finish docs.

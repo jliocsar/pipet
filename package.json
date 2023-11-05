@@ -1,11 +1,11 @@
 {
   "name": "@jliocsar/pipet",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "main": "pipet.ts",
   "license": "MIT",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "run": "tsx index.test.ts",
+    "prepublish": "yarn build",
+    "test": "tsx index.test.ts",
     "build": "tsc -p ."
   },
   "devDependencies": {

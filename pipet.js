@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import * as childProcess from 'node:child_process';
 import * as timers from 'node:timers/promises';
 const BIN = Symbol('BIN');
+const INJECT = Symbol('INJECT');
 class PipetError extends Error {
     constructor(message) {
         super(message);
@@ -12,9 +13,12 @@ export class Pipet {
     // Env is accumulated (not overwritten) for each script
     // This behavior can be changed in the `buildNextScriptParams` method
     // if necessary someday
-    env = process.env;
+    env;
     abortController;
+    args;
     constructor() {
+        this.env = process.env;
+        this.args = [];
         this.abortController = new AbortController();
     }
     async run(runnables, options) {
@@ -34,14 +38,21 @@ export class Pipet {
     async reduce(runnables, options) {
         const length = runnables.length;
         const results = [];
-        // Args isn't accumulated as env
-        let args = [];
         let index = 0;
         while (index < length) {
             const runnableDef = runnables[index];
             if (!this.isScriptDef(runnableDef)) {
+                if (this.isInject(runnableDef)) {
+                    if ('env' in runnableDef) {
+                        Object.assign(this.env, runnableDef.env(this.env));
+                    }
+                    else if (runnableDef.args) {
+                        this.args = runnableDef.args(this.args);
+                    }
+                    index++;
+                    continue;
+                }
                 await runnableDef(results);
-                results.push(1);
                 index++;
                 continue;
             }
@@ -54,23 +65,25 @@ export class Pipet {
             const argsEntries = runnableDef.next?.args
                 ? Object.entries(runnableDef.next.args)
                 : [];
+            const spawnOptions = {
+                env: this.env,
+                args: this.args,
+                signal: this.abortController.signal,
+                onData: chunk => {
+                    const { args: nextArgs, continueEarly, abortEarly, } = this.buildNextScriptParams((data += chunk), {
+                        label: runnableDef.script,
+                        envEntries,
+                        env: this.env,
+                        argsEntries,
+                    });
+                    this.args = nextArgs;
+                    return { continueEarly, abortEarly };
+                },
+            };
+            Object.assign(spawnOptions, options);
             let data = '';
             try {
-                await this.spawn(runnableDef, {
-                    env: this.env,
-                    args,
-                    signal: this.abortController.signal,
-                    onData: chunk => {
-                        const { args: nextArgs, continueEarly, abortEarly, } = this.buildNextScriptParams((data += chunk), {
-                            label: runnableDef.script,
-                            envEntries,
-                            env: this.env,
-                            argsEntries,
-                        });
-                        args = nextArgs;
-                        return { continueEarly, abortEarly };
-                    },
-                });
+                await this.spawn(runnableDef, spawnOptions);
                 Object.assign(this.env, runnableDef.next?.decorateEnv?.(this.env) ?? {});
                 results.push(1);
             }
@@ -84,8 +97,7 @@ export class Pipet {
         return results;
     }
     serialize(scriptDefEnv) {
-        const entries = Object.entries(scriptDefEnv);
-        return entries.reduce((env, [key, def]) => {
+        return Object.entries(scriptDefEnv).reduce((env, [key, def]) => {
             if (def === undefined || def === null) {
                 throw new PipetError(`Env "${key}" is \`undefined\` or \`null\``);
             }
@@ -249,6 +261,9 @@ export class Pipet {
     isScriptDef(runnable) {
         return 'script' in runnable;
     }
+    isInject(runnable) {
+        return INJECT in runnable;
+    }
 }
 /** Utility functions map */
 export const U = {
@@ -264,6 +279,18 @@ export const U = {
 };
 /** Builder functions map */
 export const B = {
+    decorateEnv(env) {
+        return {
+            [INJECT]: true,
+            env,
+        };
+    },
+    decorateArgs(args) {
+        return {
+            [INJECT]: true,
+            args,
+        };
+    },
     bin(bin, env, next) {
         return {
             [BIN]: true,

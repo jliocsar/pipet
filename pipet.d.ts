@@ -5,6 +5,7 @@ type Dict<T> = {
 type Nullable<T> = T | null;
 type Promiseable<T> = T | Promise<T>;
 declare const BIN: unique symbol;
+declare const INJECT: unique symbol;
 type BinOptions = {
     /** @default process.cwd() */
     cwd?: string;
@@ -20,6 +21,14 @@ type ValueDef = {
     array?: boolean;
     abortEarly?: boolean;
     continueEarly?: boolean;
+};
+type InjectEnvDef<Env extends ScriptEnv = ScriptEnv> = {
+    [INJECT]: true;
+    env: (env: NodeJS.ProcessEnv) => Env;
+};
+type InjectArgsDef<Args extends string[] = string[]> = {
+    [INJECT]: true;
+    args: (args: string[]) => Args;
 };
 type ArgDef = Omit<ValueDef, 'array'> & {
     /** @default '--' */
@@ -47,7 +56,7 @@ type NextDef = {
     };
     decorateEnv?(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv;
 };
-type RunnableDef = ((results: (1 | Error)[]) => Promise<(...args: any[]) => any>) | ScriptDef;
+type RunnableDef = ((results: (1 | Error)[]) => Promise<(...args: any[]) => any>) | ScriptDef | InjectEnvDef | InjectArgsDef;
 export type ScriptEnv = Nullable<Dict<any> | NodeJS.ProcessEnv | 'inherit'>;
 export type ScriptArgs = Nullable<NextDef['args']>;
 export type ScriptDef<Script extends string = string, Env extends ScriptEnv = ScriptEnv, Args extends ScriptArgs = ScriptArgs> = BinOptions & {
@@ -68,6 +77,7 @@ export type PipetOptions = PipetHooks & BinOptions;
 export declare class Pipet {
     private readonly env;
     private readonly abortController;
+    private args;
     constructor();
     run<Runnables extends RunnableDef[], Options extends PipetOptions>(runnables: Runnables, options?: Options): Promise<(Error | 1)[]>;
     private reduce;
@@ -77,6 +87,7 @@ export declare class Pipet {
     private buildFromGlobalMatch;
     private buildNextScriptParams;
     private isScriptDef;
+    private isInject;
 }
 /** Utility functions map */
 export declare const U: {
@@ -86,7 +97,9 @@ export declare const U: {
 };
 /** Builder functions map */
 export declare const B: {
-    readonly bin: <Bin extends string, Env extends ScriptEnv = ScriptEnv>(bin: Bin, env?: Env | undefined, next?: NextDef) => ScriptDef<Bin, Env, ScriptArgs>;
-    readonly script: <Script extends string, Env_1 extends ScriptEnv = ScriptEnv>(script: Script, env?: Env_1 | undefined, next?: NextDef) => ScriptDef<Script, Env_1, ScriptArgs>;
+    readonly decorateEnv: <Env extends ScriptEnv = ScriptEnv>(env: (env: NodeJS.ProcessEnv) => Env) => InjectEnvDef<Env>;
+    readonly decorateArgs: <Args extends string[] = string[]>(args: (args: string[]) => Args) => InjectArgsDef<Args>;
+    readonly bin: <Bin extends string, Env_1 extends ScriptEnv = ScriptEnv>(bin: Bin, env?: Env_1 | undefined, next?: NextDef) => ScriptDef<Bin, Env_1, ScriptArgs>;
+    readonly script: <Script extends string, Env_2 extends ScriptEnv = ScriptEnv>(script: Script, env?: Env_2 | undefined, next?: NextDef) => ScriptDef<Script, Env_2, ScriptArgs>;
 };
 export {};

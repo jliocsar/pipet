@@ -23,6 +23,14 @@ new Pipet().run(
         },
       },
     }),
+    B.decorateEnv(env => {
+      env.count = '20'
+      return env
+    }),
+    B.decorateArgs(args => {
+      console.log({ args })
+      return ['--title=hello']
+    }),
     B.script('scriptpath.js', null, {
       env: {
         countResult: {

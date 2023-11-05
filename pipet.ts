@@ -10,6 +10,7 @@ type Nullable<T> = T | null
 type Promiseable<T> = T | Promise<T>
 
 const BIN = Symbol('BIN')
+const INJECT = Symbol('INJECT')
 
 type BinOptions = {
   /** @default process.cwd() */
@@ -26,6 +27,14 @@ type ValueDef = {
   array?: boolean
   abortEarly?: boolean
   continueEarly?: boolean
+}
+type InjectEnvDef<Env extends ScriptEnv = ScriptEnv> = {
+  [INJECT]: true
+  env: (env: NodeJS.ProcessEnv) => Env
+}
+type InjectArgsDef<Args extends string[] = string[]> = {
+  [INJECT]: true
+  args: (args: string[]) => Args
 }
 type ArgDef = Omit<ValueDef, 'array'> & {
   /** @default '--' */
@@ -63,6 +72,8 @@ type NextArgEntry = [EnvKey: string, NextArgDef]
 type RunnableDef =
   | ((results: (1 | Error)[]) => Promise<(...args: any[]) => any>)
   | ScriptDef
+  | InjectEnvDef
+  | InjectArgsDef
 
 export type ScriptEnv = Nullable<Dict<any> | NodeJS.ProcessEnv | 'inherit'>
 export type ScriptArgs = Nullable<NextDef['args']>
@@ -103,10 +114,13 @@ export class Pipet {
   // Env is accumulated (not overwritten) for each script
   // This behavior can be changed in the `buildNextScriptParams` method
   // if necessary someday
-  private readonly env: NodeJS.ProcessEnv = process.env
+  private readonly env: NodeJS.ProcessEnv
   private readonly abortController: AbortController
+  private args: string[]
 
   constructor() {
+    this.env = process.env
+    this.args = []
     this.abortController = new AbortController()
   }
 
@@ -134,14 +148,20 @@ export class Pipet {
   >(runnables: Runnables, options?: Options) {
     const length = runnables.length
     const results: (1 | Error)[] = []
-    // Args isn't accumulated as env
-    let args: string[] = []
     let index = 0
     while (index < length) {
       const runnableDef = runnables[index]
       if (!this.isScriptDef(runnableDef)) {
+        if (this.isInject(runnableDef)) {
+          if ('env' in runnableDef) {
+            Object.assign(this.env, runnableDef.env(this.env))
+          } else if (runnableDef.args) {
+            this.args = runnableDef.args(this.args)
+          }
+          index++
+          continue
+        }
         await runnableDef(results)
-        results.push(1)
         index++
         continue
       }
@@ -156,7 +176,7 @@ export class Pipet {
         : []
       const spawnOptions = <SpawnOptions<Options>>{
         env: this.env,
-        args,
+        args: this.args,
         signal: this.abortController.signal,
         onData: chunk => {
           const {
@@ -169,7 +189,7 @@ export class Pipet {
             env: this.env,
             argsEntries,
           })
-          args = nextArgs
+          this.args = nextArgs
           return { continueEarly, abortEarly }
         },
       }
@@ -397,6 +417,12 @@ export class Pipet {
   private isScriptDef(runnable: RunnableDef): runnable is ScriptDef {
     return 'script' in runnable
   }
+
+  private isInject(
+    runnable: RunnableDef,
+  ): runnable is InjectEnvDef | InjectArgsDef {
+    return INJECT in runnable
+  }
 }
 
 /** Utility functions map */
@@ -414,6 +440,22 @@ export const U = {
 
 /** Builder functions map */
 export const B = {
+  decorateEnv<Env extends ScriptEnv = ScriptEnv>(
+    env: (env: NodeJS.ProcessEnv) => Env,
+  ): InjectEnvDef<Env> {
+    return {
+      [INJECT]: true,
+      env,
+    }
+  },
+  decorateArgs<Args extends string[] = string[]>(
+    args: (args: string[]) => Args,
+  ): InjectArgsDef<Args> {
+    return {
+      [INJECT]: true,
+      args,
+    }
+  },
   bin<Bin extends string, Env extends ScriptEnv = ScriptEnv>(
     bin: Bin,
     env?: Env,
