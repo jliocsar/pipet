@@ -15,7 +15,7 @@ new Pipet().run(
         },
       },
     }),
-    U.sleep(5),
+    U.log('Hello world'),
     B.script('scriptpath.js', null, {
       env: {
         countResult: {

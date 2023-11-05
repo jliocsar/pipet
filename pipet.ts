@@ -114,13 +114,17 @@ export class Pipet {
     Runnables extends RunnableDef[],
     Options extends PipetOptions,
   >(runnables: Runnables, options?: Options) {
+    const length = runnables.length
     const results: (1 | Error)[] = []
     // Args isn't accumulated as env
     let args: string[] = []
-    for (const runnableDef of runnables) {
+    let index = 0
+    while (index < length) {
+      const runnableDef = runnables[index]
       if (!this.isScriptDef(runnableDef)) {
         await runnableDef(results)
         results.push(1)
+        index++
         continue
       }
       const cwd = options?.cwd ?? runnableDef.cwd ?? process.cwd()
@@ -164,6 +168,7 @@ export class Pipet {
         console.error(pipetError)
         results.push(pipetError)
       }
+      index++
     }
     return results
   }
