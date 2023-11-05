@@ -39,6 +39,14 @@ The `U` namespace exports all utility functions that can be used during your pip
 
 Logs a message to the terminal between scripts in the pipeline.
 
+#### `U.tap`
+
+Runs a side-effect on the accumulated array of results.
+
+#### `U.sleep`
+
+Sleeps N seconds between scripts run.
+
 ## Example
 
 ```js
@@ -68,16 +76,17 @@ pipet.run(
         // Will add `countResult` as an env. variable
         // on the next script
         countResult: {
-          match: /Count is (.+) and (.+)/,
-          csv: true,
+          match: /countResult is (.+)/,
         },
       },
     }),
-    B.script('last-script-path.ts', null, {
+    U.tap(console.log),
+    B.script('last-script-path.py', null, {
+      bin: 'python',
       args: {
         // Will pass `...matched[]` as arguments to the next script
         $: {
-          match: /Count is (.+) and (.+)/,
+          match: /countResult is (.+) and (.+)/,
           csv: true,
           separator: ' ',
         },
@@ -97,5 +106,4 @@ pipet.run(
 ## TODO
 
 - [ ] npm publish;
-- [ ] Allow different `bin` for each script;
 - [ ] Finish docs.

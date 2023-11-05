@@ -11,11 +11,11 @@ new Pipet().run(
         'count-result': {
           match: /Count is (.+) and (.+)/,
           csv: true,
-          continueEarly: true,
+          abortEarly: true,
         },
       },
     }),
-    U.log('hello'),
+    U.sleep(5),
     B.script('scriptpath.js', null, {
       env: {
         countResult: {
@@ -34,6 +34,7 @@ new Pipet().run(
         },
       },
     }),
+    U.tap(console.log),
     B.script('scriptpath.js', env),
   ],
   {
