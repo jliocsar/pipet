@@ -86,6 +86,11 @@ export type PipetHooks = {
   afterRun?: () => Promiseable<void>
 }
 export type PipetOptions = PipetHooks & BinOptions
+type SpawnOptions<Options extends PipetOptions> = childProcess.SpawnOptions &
+  Options & {
+    args?: string[]
+    onData?(data: string): { continueEarly?: boolean; abortEarly?: boolean }
+  }
 
 class PipetError extends Error {
   constructor(message: string) {
@@ -149,27 +154,29 @@ export class Pipet {
       const argsEntries = runnableDef.next?.args
         ? Object.entries(runnableDef.next.args)
         : []
+      const spawnOptions = <SpawnOptions<Options>>{
+        env: this.env,
+        args,
+        signal: this.abortController.signal,
+        onData: chunk => {
+          const {
+            args: nextArgs,
+            continueEarly,
+            abortEarly,
+          } = this.buildNextScriptParams((data += chunk), {
+            label: runnableDef.script,
+            envEntries,
+            env: this.env,
+            argsEntries,
+          })
+          args = nextArgs
+          return { continueEarly, abortEarly }
+        },
+      }
+      Object.assign(spawnOptions, options)
       let data = ''
       try {
-        await this.spawn(runnableDef, {
-          env: this.env,
-          args,
-          signal: this.abortController.signal,
-          onData: chunk => {
-            const {
-              args: nextArgs,
-              continueEarly,
-              abortEarly,
-            } = this.buildNextScriptParams((data += chunk), {
-              label: runnableDef.script,
-              envEntries,
-              env: this.env,
-              argsEntries,
-            })
-            args = nextArgs
-            return { continueEarly, abortEarly }
-          },
-        })
+        await this.spawn(runnableDef, spawnOptions)
         Object.assign(this.env, runnableDef.next?.decorateEnv?.(this.env) ?? {})
         results.push(1)
       } catch (error) {
@@ -183,23 +190,25 @@ export class Pipet {
   }
 
   private serialize(scriptDefEnv: Omit<ScriptDef['env'], 'inherit'>) {
-    const entries = Object.entries(scriptDefEnv)
-    return entries.reduce<NodeJS.ProcessEnv>((env, [key, def]) => {
-      if (def === undefined || def === null) {
-        throw new PipetError(`Env "${key}" is \`undefined\` or \`null\``)
-      }
-      switch (true) {
-        case def instanceof RegExp:
-          env[key] = (def as RegExp).source
-          return env
-        case typeof def === 'object':
-          env[key] = JSON.stringify(def)
-          return env
-        default:
-          env[key] = def.toString()
-          return env
-      }
-    }, {})
+    return Object.entries(scriptDefEnv).reduce<NodeJS.ProcessEnv>(
+      (env, [key, def]) => {
+        if (def === undefined || def === null) {
+          throw new PipetError(`Env "${key}" is \`undefined\` or \`null\``)
+        }
+        switch (true) {
+          case def instanceof RegExp:
+            env[key] = (def as RegExp).source
+            return env
+          case typeof def === 'object':
+            env[key] = JSON.stringify(def)
+            return env
+          default:
+            env[key] = def.toString()
+            return env
+        }
+      },
+      {},
+    )
   }
 
   private checkRequiredFields(
