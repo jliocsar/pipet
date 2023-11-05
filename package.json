@@ -5,7 +5,8 @@
   "license": "MIT",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "run": "tsx index.test.ts"
+    "run": "tsx index.test.ts",
+    "build": "tsc -p ."
   },
   "devDependencies": {
     "@types/node": "latest",

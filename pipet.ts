@@ -79,13 +79,13 @@ export type ScriptDef<
   env?: Env
 }
 
-export type Hooks = {
+export type PipetHooks = {
   /** Runs before all scripts, useful for building etc */
   beforeRun?: () => Promiseable<void>
   /** Runs after all scripts, useful for any clean up */
   afterRun?: () => Promiseable<void>
 }
-export type PipetOptions = Hooks & BinOptions
+export type PipetOptions = PipetHooks & BinOptions
 
 class PipetError extends Error {
   constructor(message: string) {
