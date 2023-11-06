@@ -1,0 +1,24 @@
+:root[data-theme="dark"] {
+  /** for rose-pine */
+  --color-background: #1d1b2c;
+  --color-background-secondary: #181726;
+  --color-accent: #6a6797;
+  --color-active-menu-item: var(--color-accent);
+}
+
+header.tsd-page-toolbar {
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(8px);
+}
+
+#tsd-search a.title {
+  font-size: 22px;
+}
+
+.tsd-page-toolbar .tsd-toolbar-contents {
+  height: 2.8rem;
+}
+
+.tsd-page-toolbar .tsd-toolbar-icon {
+  padding: 14px 0;
+}

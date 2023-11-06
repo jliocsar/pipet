@@ -4,8 +4,9 @@ module.exports = {
   name: '⚡ pipet',
   entryPoints: ['../index.ts'],
   out: '../docs',
+  customCss: './typedoc.css',
   readme: '../readme.docs.md',
-  darkHighlightTheme: 'poimandres',
+  darkHighlightTheme: 'rose-pine-moon',
   navigationLinks: {
     Repository: 'https://github.com/jliocsar/pipet',
   },

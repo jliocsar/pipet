@@ -24,7 +24,7 @@ It's also built with TypeScript, so Pipet is really easy to learn and master.
 
 ## Example
 
-```mjs
+```js
 import { Pipet, B, U } from '@jliocsar/pipet'
 
 const env = {

@@ -10,6 +10,70 @@ It acts as a pipeline with different ways of formatting/parsing the piped input 
 
 It's also built with TypeScript, so Pipet is really easy to learn and master.
 
+## Example
+
+```js
+import { Pipet, B, U } from '@jliocsar/pipet'
+
+const env = {
+  count: 0,
+}
+
+const pipet = new Pipet()
+
+pipet.run(
+  [
+    B.script('first-script-path.ts', env, {
+      args: {
+        // Will pass `--count-result=...` to the next script
+        'count-result': {
+          match: /Count is (.+) and (.+)/,
+          array: true,
+          continueEarly: true,
+        },
+      },
+    }),
+    B.decorateArgs(async args => args.concat('--another-argument')),
+    B.bin('my-binary', env),
+    U.log('hello'),
+    B.decorateEnv(async env => {
+      env.countResult = '420'
+    }),
+    B.script('second-script-path.ts', null, {
+      env: {
+        // Will add `countResult` as an env. variable
+        // on the next script
+        countResult: {
+          match: /countResult is (.+)/,
+        },
+      },
+    }),
+    U.tap(console.log),
+    B.script('last-script-path.py', null, {
+      bin: 'python',
+      args: {
+        // Will pass `...matched[]` as arguments to the next script
+        $: {
+          match: /countResult is (.+) and (.+)/,
+          array: true,
+          separator: ' ',
+        },
+      },
+    }),
+  ],
+  {
+    bin: 'tsx', // Default is 'node'
+    binArgs: ['--your-bin-arg'],
+    async beforeRun() {
+      // ... your build
+    },
+    async afterRun() {
+      // ... clean up effect
+    }
+  },
+)
+```
+
 ## Installation
 
 The easiest way to use Pipet is installing it globally, so it's then available in all of your scripts:
