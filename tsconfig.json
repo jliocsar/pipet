@@ -1,5 +1,5 @@
 {
-  "include": ["pipet.ts"],
+  "include": ["pipet.ts", "index.ts"],
   "compilerOptions": {
     "lib": ["ESNext"],
     "module": "esnext",

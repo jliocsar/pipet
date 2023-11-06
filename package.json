@@ -1,7 +1,7 @@
 {
   "name": "@jliocsar/pipet",
-  "version": "0.0.5",
-  "main": "pipet.ts",
+  "version": "0.0.6",
+  "main": "index.ts",
   "description": "Zero dependency script running framework",
   "author": "JC (https://github.com/jliocsar)",
   "license": "MIT",
