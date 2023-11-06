@@ -22,62 +22,6 @@ It acts as a pipeline with different ways of formatting/parsing the piped input 
 
 It's also built with TypeScript, so Pipet is really easy to learn and master.
 
-## Installation
-
-The easiest way to use Pipet is installing it globally, so it's then available in all of your scripts:
-
-```sh
-# with npm
-npm i -g @jliocsar/pipet
-
-# with yarn
-yarn global add @jliocsar/pipet
-
-# with bun
-bun a -g @jliocsar/pipet
-```
-
-If you want to install it as a dependency for a single project, skip the global flag and add it to your `devDependencies`.
-
-## Usage
-
-### Builder (`B`)
-
-The `B` namespace exports all utility functions used for building your scripts pipeline.
-
-
-#### `B.scripts`
-
-Builds the script definition object used in the script pipeline based on the script path.
-
-#### `B.bin`
-
-Builds the script definition object used in the script pipeline based on a CLI binary.
-
-#### `B.decorateEnv`
-
-Exposes an async injector function to decorate the env. variables of the next scripts.
-
-#### `B.decorateArgs`
-
-Exposes an async injector function to decorate the args array of the next script.
-
-### Utilities (`U`)
-
-The `U` namespace exports all utility functions that can be used during your pipeline process (i.e. logging something before affecting the script environment).
-
-#### `U.log`
-
-Logs a message to the terminal between scripts in the pipeline.
-
-#### `U.tap`
-
-Runs a side-effect on the accumulated array of results.
-
-#### `U.sleep`
-
-Sleeps N seconds between scripts run.
-
 ## Example
 
 ```js
@@ -141,6 +85,62 @@ pipet.run(
   },
 )
 ```
+
+## Installation
+
+The easiest way to use Pipet is installing it globally, so it's then available in all of your scripts:
+
+```sh
+# with npm
+npm i -g @jliocsar/pipet
+
+# with yarn
+yarn global add @jliocsar/pipet
+
+# with bun
+bun a -g @jliocsar/pipet
+```
+
+If you want to install it as a dependency for a single project, skip the global flag and add it to your `devDependencies`.
+
+## Usage
+
+### Builder (`B`)
+
+The `B` namespace exports all utility functions used for building your scripts pipeline.
+
+
+#### `B.scripts`
+
+Builds the script definition object used in the script pipeline based on the script path.
+
+#### `B.bin`
+
+Builds the script definition object used in the script pipeline based on a CLI binary.
+
+#### `B.decorateEnv`
+
+Exposes an async injector function to decorate the env. variables of the next scripts.
+
+#### `B.decorateArgs`
+
+Exposes an async injector function to decorate the args array of the next script.
+
+### Utilities (`U`)
+
+The `U` namespace exports all utility functions that can be used during your pipeline process (i.e. logging something before affecting the script environment).
+
+#### `U.log`
+
+Logs a message to the terminal between scripts in the pipeline.
+
+#### `U.tap`
+
+Runs a side-effect on the accumulated array of results.
+
+#### `U.sleep`
+
+Sleeps N seconds between scripts run.
 
 ## TODO
 
