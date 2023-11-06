@@ -1,6 +1,6 @@
 {
   "name": "@jliocsar/pipet",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "main": "index.ts",
   "description": "Zero dependency script running framework",
   "author": "JC (https://github.com/jliocsar)",
@@ -9,7 +9,7 @@
     "prepublish": "yarn build",
     "test": "tsx index.test.ts",
     "build": "typedoc && tsc -p .",
-    "serve": "serve -p 3000 docs"
+    "serve": "typedoc && serve -p 3000 docs"
   },
   "devDependencies": {
     "@types/node": "latest",

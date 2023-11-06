@@ -1,4 +1,4 @@
-import { Pipet, B, U } from './pipet'
+import { Pipet, B, U } from '.'
 
 const env = {
   count: 0,
