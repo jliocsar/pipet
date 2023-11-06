@@ -7,7 +7,7 @@
   "license": "MIT",
   "scripts": {
     "prepublish": "yarn build",
-    "test": "tsx index.test.ts",
+    "start": "tsx index.test.ts",
     "build": "typedoc && tsc -p .",
     "serve": "concurrently --kill-others 'typedoc --watch' 'serve -p 3000 docs'"
   },
