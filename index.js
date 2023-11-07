@@ -2,10 +2,30 @@ import * as path from 'node:path';
 import * as childProcess from 'node:child_process';
 import * as timers from 'node:timers/promises';
 /** @internal */
-const BIN = Symbol('BIN');
+class InjectEnvDef {
+    env;
+    constructor(env) {
+        this.env = env;
+    }
+}
 /** @internal */
-const INJECT = Symbol('INJECT');
-class PipetError extends Error {
+class InjectArgsDef {
+    args;
+    constructor(args) {
+        this.args = args;
+    }
+}
+export class ScriptDef {
+    script;
+    next;
+    constructor(script, next) {
+        this.script = script;
+        this.next = next;
+    }
+}
+export class BinScriptDef extends ScriptDef {
+}
+export class PipetError extends Error {
     constructor(message) {
         super(message);
         this.name = 'PipetError';
@@ -23,10 +43,19 @@ export class Pipet {
         this.args = [];
         this.abortController = new AbortController();
     }
+    /**
+     * Runs a series of scripts or utility functions in order.
+     * @param runnables Scripts or utility functions to run
+     * @param optionsOptions to pass to the scripts (overridden by the script options)
+     * @returns An array of results from each script
+     */
     async run(runnables, options) {
         const length = runnables.length;
         if (length < 1) {
             throw new PipetError('Need at least 1 script to run');
+        }
+        if (options?.initialEnv && options.initialEnv !== 'inherit') {
+            Object.assign(this.env, this.serialize(options.initialEnv));
         }
         if (options?.beforeRun) {
             await options.beforeRun();
@@ -43,7 +72,7 @@ export class Pipet {
         let index = 0;
         while (index < length) {
             const runnableDef = runnables[index];
-            if (!this.isScriptDef(runnableDef)) {
+            if (!(runnableDef instanceof ScriptDef)) {
                 if (this.isInject(runnableDef)) {
                     if ('env' in runnableDef) {
                         Object.assign(this.env, await runnableDef.env(this.env));
@@ -57,9 +86,6 @@ export class Pipet {
                 await runnableDef(results);
                 index++;
                 continue;
-            }
-            if (runnableDef.env && runnableDef.env !== 'inherit') {
-                Object.assign(this.env, this.serialize(runnableDef.env));
             }
             const envEntries = runnableDef.next?.env
                 ? Object.entries(runnableDef.next.env)
@@ -86,7 +112,6 @@ export class Pipet {
             let data = '';
             try {
                 await this.spawn(runnableDef, spawnOptions);
-                Object.assign(this.env, runnableDef.next?.decorateEnv?.(this.env) ?? {});
                 results.push(1);
             }
             catch (error) {
@@ -98,8 +123,8 @@ export class Pipet {
         }
         return results;
     }
-    serialize(scriptDefEnv) {
-        return Object.entries(scriptDefEnv).reduce((env, [key, def]) => {
+    serialize(initialEnv) {
+        return Object.entries(initialEnv).reduce((env, [key, def]) => {
             if (def === undefined || def === null) {
                 throw new PipetError(`Env "${key}" is \`undefined\` or \`null\``);
             }
@@ -134,7 +159,7 @@ export class Pipet {
                 const binArgs = options?.binArgs ?? scriptDef.binArgs ?? [];
                 let bin = null;
                 let args = null;
-                if (scriptDef[BIN]) {
+                if (scriptDef instanceof BinScriptDef) {
                     bin = scriptDef.script;
                     args = binArgs.concat(options?.args ?? []);
                 }
@@ -260,20 +285,29 @@ export class Pipet {
         this.checkRequiredFields(params.label, params.envEntries, params.env);
         return { args, continueEarly: envContinueEarly, abortEarly: envAbortEarly };
     }
-    isScriptDef(runnable) {
-        return 'script' in runnable;
-    }
     isInject(runnable) {
-        return INJECT in runnable;
+        return runnable instanceof InjectEnvDef || runnable instanceof InjectArgsDef;
     }
 }
-class Utility {
+/** Utility functions map */
+export class Utility {
+    /**
+     * Prints a message to `stdout` between script runs.
+     * @param message Message to print to `stdout`
+     */
     log(message) {
         return this.torun(() => process.stdout.write(message + '\n'));
     }
+    /**
+     * Runs a callback for the current results on the script chain.
+     */
     tap(cb) {
         return this.torun(cb);
     }
+    /**
+     * Sleeps for the specified number of seconds between script runs.
+     * @param seconds Number of seconds to sleep
+     */
     sleep(seconds) {
         return this.torun(() => timers.setTimeout(seconds * 1000));
     }
@@ -282,36 +316,44 @@ class Utility {
         return (...args) => cb(...args);
     }
 }
-class Builder {
+/** Builder functions map */
+export class Builder {
+    /**
+     * Decorates the environment variables passed to the next script.
+     * @param env Async callback that receives the accumulated environment variables
+     * @returns The decorated environment variables
+     */
     decorateEnv(env) {
-        return {
-            [INJECT]: true,
-            env,
-        };
+        return new InjectEnvDef(env);
     }
+    /**
+     * Decorates the arguments passed to the next script.
+     * @param args Async callback that receives the accumulated arguments
+     * @returns The decorated arguments
+     */
     decorateArgs(args) {
-        return {
-            [INJECT]: true,
-            args,
-        };
+        return new InjectArgsDef(args);
     }
-    bin(bin, env, next) {
-        return {
-            [BIN]: true,
-            script: bin,
-            env,
-            next,
-        };
+    /**
+     * Builds a script definition for a binary.
+     * @param bin The binary to run
+     * @param env Environment variables to pass to the binary
+     * @param next Options to pass to the next script
+     * @returns The script definition
+     */
+    bin(bin, next) {
+        return new BinScriptDef(bin, next);
     }
-    script(script, env, next) {
-        return {
-            script,
-            env,
-            next,
-        };
+    /**
+     * Builds a script definition.
+     * @param script The script path
+     * @param env Environment variables to pass to the script
+     * @param next Options to pass to the next script
+     * @returns The script definition
+     */
+    script(script, next) {
+        return new ScriptDef(script, next);
     }
 }
-/** Builder functions map */
 export const B = new Builder();
-/** Utility functions map */
 export const U = new Utility();

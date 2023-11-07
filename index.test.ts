@@ -1,12 +1,12 @@
 import { Pipet, B, U } from '.'
 
-const env = {
+const initialEnv = {
   count: 0,
 }
 
 new Pipet().run(
   [
-    B.script('scriptpath.js', env, {
+    B.script('scriptpath.js', {
       args: {
         version: {
           boolean: true,
@@ -15,8 +15,8 @@ new Pipet().run(
     }),
     B.bin('jstr'),
     U.log('Hello world'),
-    B.script('scriptpath.js', null, {
-      env: {
+    B.script('scriptpath.js', {
+      args: {
         countResult: {
           match: /Count is (.+) and (.+)/,
           array: true,
@@ -29,9 +29,9 @@ new Pipet().run(
     }),
     B.decorateArgs(args => {
       console.log({ args })
-      return ['--title=hello']
+      return args.concat('--title=hello')
     }),
-    B.script('scriptpath.js', null, {
+    B.script('scriptpath.js', {
       env: {
         countResult: {
           match: /Count is (.+) and (.+)/,
@@ -39,8 +39,8 @@ new Pipet().run(
         },
       },
     }),
-    B.script('scriptpath.js', env),
-    B.script('scriptpath.js', null, {
+    B.script('scriptpath.js'),
+    B.script('scriptpath.js', {
       args: {
         $: {
           match: /Count is (.+) and (.+)/,
@@ -50,13 +50,16 @@ new Pipet().run(
       },
     }),
     U.tap(console.log),
-    B.script('scriptpath.js', env),
+    B.script('scriptpath.js'),
   ],
   {
+    initialEnv,
     binArgs: ['--title=hello'],
-    async beforeRun() {},
-    afterRun() {
-      console.log('hehe')
+    async beforeRun() {
+      // run any setup effect (like building)
+    },
+    async afterRun() {
+      // run any clean up effect
     },
   },
 )

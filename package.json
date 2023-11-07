@@ -1,13 +1,13 @@
 {
   "name": "@jliocsar/pipet",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "main": "index.ts",
   "description": "Zero dependency script running framework",
   "author": "JC (https://github.com/jliocsar)",
   "license": "MIT",
   "scripts": {
     "prepublish": "yarn build",
-    "start": "tsx index.test.ts",
+    "test": "tsx index.test.ts",
     "build": "typedoc && tsc -p .",
     "serve": "concurrently --kill-others 'typedoc --watch' 'serve -p 3000 docs'"
   },
