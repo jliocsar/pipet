@@ -25,7 +25,7 @@ It's also built with TypeScript, so Pipet is really easy to learn and master.
 ## Example
 
 ```js
-import { Pipet, B, U } from '@jliocsar/pipet'
+const { Pipet, B, U } = require('@jliocsar/pipet')
 
 const initialEnv = {
   count: 0,
@@ -58,7 +58,9 @@ new Pipet().run(
       console.log({ args })
       return args.concat('--title=hello')
     }),
-    B.script('3rd-script-path.js', {
+    B.script('3rd-script-path.ts', {
+      bin: 'bun',
+      binArgs: ['run', '--bun'],
       env: {
         countResult: {
           match: /Count is (.+) and (.+)/,

@@ -13,48 +13,55 @@ It's also built with TypeScript, so Pipet is really easy to learn and master.
 ## Example
 
 ```js
-import { Pipet, B, U } from '@jliocsar/pipet'
+const { Pipet, B, U } = require('@jliocsar/pipet')
 
-const env = {
+const initialEnv = {
   count: 0,
 }
 
-const pipet = new Pipet()
-
-pipet.run(
+new Pipet().run(
   [
-    B.script('first-script-path.ts', env, {
+    B.script('1st-script-path.ts', {
       args: {
-        // Will pass `--count-result=...` to the next script
-        'count-result': {
-          match: /Count is (.+) and (.+)/,
-          array: true,
-          continueEarly: true,
+        version: {
+          boolean: true,
         },
       },
     }),
-    B.decorateArgs(async args => args.concat('--another-argument')),
-    B.bin('my-binary', env),
-    U.log('hello'),
-    B.decorateEnv(async env => {
-      env.countResult = '420'
-    }),
-    B.script('second-script-path.ts', null, {
-      env: {
-        // Will add `countResult` as an env. variable
-        // on the next script
+    B.bin('jstr'),
+    U.log('Hello world'),
+    B.script('2nd-script-path.ts', {
+      args: {
         countResult: {
-          match: /countResult is (.+)/,
+          match: /Count is (.+) and (.+)/,
+          array: true,
+        },
+      },
+    }),
+    B.decorateEnv(env => {
+      env.count = '20'
+      return env
+    }),
+    B.decorateArgs(args => {
+      console.log({ args })
+      return args.concat('--title=hello')
+    }),
+    B.script('3rd-script-path.ts', {
+      bin: 'bun',
+      binArgs: ['run', '--bun'],
+      env: {
+        countResult: {
+          match: /Count is (.+) and (.+)/,
+          array: true,
         },
       },
     }),
     U.tap(console.log),
-    B.script('last-script-path.py', null, {
+    B.script('last-script.py', {
       bin: 'python',
       args: {
-        // Will pass `...matched[]` as arguments to the next script
         $: {
-          match: /countResult is (.+) and (.+)/,
+          match: /Count is (.+) and (.+)/,
           array: true,
           separator: ' ',
         },
@@ -62,14 +69,14 @@ pipet.run(
     }),
   ],
   {
-    bin: 'tsx', // Default is 'node'
-    binArgs: ['--your-bin-arg'],
+    initialEnv,
+    binArgs: ['--title=hello'],
     async beforeRun() {
-      // ... your build
+      // run any setup effect (like building)
     },
     async afterRun() {
-      // ... clean up effect
-    }
+      // run any clean up effect
+    },
   },
 )
 ```
