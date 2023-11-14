@@ -1,7 +1,5 @@
 ## Introduction
 
-🏗️ W.I.P. 🏗️
-
 > _**t**erminal **pipe**_ **=** `pipet`
 
 Pipet is a zero dependency script-running framework; it provides an easy way to build different script inputs with different arguments/environment variables based on the output from previous scripts (or just pure JS/TS). It supports any kind of binary/executable, meaning you can use scripts for any language you'd like.
@@ -21,7 +19,7 @@ const initialEnv = {
 
 new Pipet().run(
   [
-    B.script('1st-script-path.ts', {
+    B.script('1st-script-path.js', {
       args: {
         version: {
           boolean: true,
@@ -31,6 +29,7 @@ new Pipet().run(
     B.bin('jstr'),
     U.log('Hello world'),
     B.script('2nd-script-path.ts', {
+      bin: 'tsx', // default is `"node"`
       args: {
         countResult: {
           match: /Count is (.+) and (.+)/,
@@ -46,7 +45,7 @@ new Pipet().run(
       console.log({ args })
       return args.concat('--title=hello')
     }),
-    B.script('3rd-script-path.ts', {
+    B.script('3rd-script-path.js', {
       bin: 'bun',
       binArgs: ['run', '--bun'],
       env: {
